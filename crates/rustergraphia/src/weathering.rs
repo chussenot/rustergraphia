@@ -455,7 +455,7 @@ pub mod edition {
             return Err(Error::decode("Sequence has an odd number of values"));
         }
         let mut tokens = Vec::new();
-        for pair in cells.chunks_exact(2) {
+        for pair in cells.as_chunks::<2>().0 {
             let (firsts, hurt_a) = &pair[0];
             let (seconds, hurt_b) = &pair[1];
             let letters = readings(firsts, seconds);

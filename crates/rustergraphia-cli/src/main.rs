@@ -236,7 +236,9 @@ fn inscribe(options: &Options) -> Result<(), String> {
         };
         println!("Weathered: {lacunae_count}. Restore them by balancing the pairs (-d shows the edition)");
         if options.pathless {
-            println!("Pathless: the plate says nothing of where it begins; the bench finds the way");
+            println!(
+                "Pathless: the plate says nothing of where it begins; the bench finds the way"
+            );
         }
         (sequence, svg, written_layout) = (seq, drawn, layout);
     } else if let Some(decoy) = &options.decoy {
@@ -339,13 +341,7 @@ fn tablet_lines(seed: &str) -> Result<String, String> {
     let rows: Vec<String> = tablet::rows(seed)
         .map_err(|e| e.to_string())?
         .into_iter()
-        .map(|(c, value)| {
-            format!(
-                "{} {:04}",
-                if c == ' ' { '\u{2423}' } else { c },
-                value
-            )
-        })
+        .map(|(c, value)| format!("{} {:04}", if c == ' ' { '\u{2423}' } else { c }, value))
         .collect();
     let columns: Vec<&[String]> = rows.chunks(9).collect();
     let mut lines = vec![format!(
@@ -380,8 +376,7 @@ fn write_stencils(path: &Path, size: usize, grilles: &[Grille]) -> Result<(), St
                 None => format!("{text}-novice.svg"),
             })
         };
-        let stencil =
-            rustergraphia::svg::stencil(size, grille).map_err(|e| e.to_string())?;
+        let stencil = rustergraphia::svg::stencil(size, grille).map_err(|e| e.to_string())?;
         std::fs::write(&file, stencil).map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -399,8 +394,7 @@ fn ask_passphrase(confirm: bool) -> Result<String, String> {
                 .to_string(),
         );
     }
-    let passphrase =
-        rpassword::prompt_password("Passphrase: ").map_err(|e| e.to_string())?;
+    let passphrase = rpassword::prompt_password("Passphrase: ").map_err(|e| e.to_string())?;
     if confirm {
         if let Some(problem) = secret::passphrase_problem(&passphrase) {
             return Err(problem); // before asking for it twice
@@ -450,9 +444,17 @@ fn convert_to_png(input: &Path, output: &Path) {
             input.as_os_str(),
         ])
     } else if command_exists("magick") {
-        Some(vec!["magick".as_ref(), input.as_os_str(), output.as_os_str()])
+        Some(vec![
+            "magick".as_ref(),
+            input.as_os_str(),
+            output.as_os_str(),
+        ])
     } else if command_exists("convert") {
-        Some(vec!["convert".as_ref(), input.as_os_str(), output.as_os_str()])
+        Some(vec![
+            "convert".as_ref(),
+            input.as_os_str(),
+            output.as_os_str(),
+        ])
     } else {
         None
     };
@@ -460,13 +462,17 @@ fn convert_to_png(input: &Path, output: &Path) {
         eprintln!("Skipping PNG: install librsvg (rsvg-convert) or ImageMagick");
         return;
     };
-    let status = std::process::Command::new(parts[0]).args(&parts[1..]).status();
+    let status = std::process::Command::new(parts[0])
+        .args(&parts[1..])
+        .status();
     match status {
         Ok(status) if status.success() => {}
         Ok(status) => eprintln!(
             "PNG conversion failed: {} exited with {}",
             parts[0].to_string_lossy(),
-            status.code().map_or_else(|| "?".to_string(), |c| c.to_string())
+            status
+                .code()
+                .map_or_else(|| "?".to_string(), |c| c.to_string())
         ),
         Err(error) => eprintln!(
             "PNG conversion failed: {} ({error})",

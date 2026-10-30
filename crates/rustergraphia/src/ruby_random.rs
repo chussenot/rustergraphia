@@ -70,8 +70,10 @@ impl RubyRandom {
         padded.resize((4 - bytes.len() % 4) % 4, 0u8);
         padded.extend_from_slice(bytes);
         let mut words: Vec<u32> = padded
-            .chunks_exact(4)
-            .map(|chunk| u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|&chunk| u32::from_be_bytes(chunk))
             .collect();
         words.reverse(); // least significant word first
         Self::from_words(&words)
