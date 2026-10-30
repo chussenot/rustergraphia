@@ -8,6 +8,16 @@ use crate::layout::Layout;
 use crate::Value;
 
 pub const CLASS: &str = "tally-lines";
+
+/// A grid line a sign lies on: its row, or its column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum CordKind {
+    Row,
+    Col,
+}
+
+/// One of the lines a reading-order index belongs to, as `(kind, number)`.
+pub type Cord = (CordKind, i32);
 pub const RUBRIC: &str = "#a3301c"; // the tally signs and their cords, as a scribe's rubric
 pub const NOT_UNDER_A_GRILLE: &str = "Tally signs are not drawn under a grille yet";
 pub const NOT_SEALED: &str = "Tally signs are for game plates: a sealed plate never loses a stroke";
