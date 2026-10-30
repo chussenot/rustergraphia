@@ -214,6 +214,20 @@ impl Grille {
     }
 }
 
+/// A square plate needs its grille, and a grille needs a square plate.
+pub fn check(svg: &str, layout: Option<&crate::layout::Layout>) -> Result<()> {
+    let square = crate::svg::is_square(svg);
+    if square && layout.is_none() {
+        return Err(Error::GrilleKeyNeeded(
+            "This plate was written under a grille: it needs its key".to_string(),
+        ));
+    }
+    if matches!(layout, Some(crate::layout::Layout::Grille(_))) && !square {
+        return Err(Error::decode("This plate was not written under a grille"));
+    }
+    Ok(())
+}
+
 /// A key as written anywhere, upper-cased with spaces, tabs and dashes gone
 /// and the look-alikes (O for 0, I or L for 1) read as Crockford does.
 pub fn normalize_code(key: &str) -> String {
