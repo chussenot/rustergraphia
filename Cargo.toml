@@ -21,6 +21,8 @@ num-bigint = "0.4"
 getrandom = "0.2"
 xmltree = "0.11"
 thiserror = "1"
+clap = { version = "4", features = ["derive"] }
+rpassword = "7"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 
