@@ -1,0 +1,10 @@
+[package]
+name = "rustergraphia-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Web application for Rustergraphia"
+
+[dependencies]
+rustergraphia.workspace = true
