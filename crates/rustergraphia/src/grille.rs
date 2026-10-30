@@ -98,7 +98,7 @@ impl Grille {
     /// top-left quarter, followed by where a quarter turn clockwise takes
     /// it, three times.
     pub fn orbits(size: usize) -> Result<Vec<[(i32, i32); 4]>> {
-        if size % 2 != 0 {
+        if !size.is_multiple_of(2) {
             return Err(Error::other("A grille needs a plate with an even side"));
         }
         let half = size / 2;
@@ -135,7 +135,9 @@ impl Grille {
         let code: String = bits[..LENGTH * 5]
             .chunks(5)
             .map(|chunk| {
-                let index = chunk.iter().fold(0usize, |acc, bit| (acc << 1) | *bit as usize);
+                let index = chunk
+                    .iter()
+                    .fold(0usize, |acc, bit| (acc << 1) | *bit as usize);
                 alphabet[index] as char
             })
             .collect();
