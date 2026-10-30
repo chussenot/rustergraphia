@@ -242,7 +242,8 @@ impl RubyRandom {
 
     /// `array.sample(n, random: self)`: the indices MRI draws, in MRI's
     /// order, for n of `len` (n <= len). Replicates array.c's special cases
-    /// for n of 1 to 3 and its partial shuffle beyond.
+    /// for n of 1 to 3, its sorted-insertion draw for n up to 10, and its
+    /// partial shuffle beyond.
     pub fn sample_indices(&mut self, n: usize, len: usize) -> Vec<usize> {
         assert!(n <= len, "sample takes at most the whole array");
         match n {
@@ -275,6 +276,23 @@ impl RubyRandom {
                     }
                 }
                 vec![i, j, k]
+            }
+            4..=10 => {
+                // MRI draws into a shrinking range and shifts each draw past
+                // the indices already taken (array.c's sorted-insertion case)
+                let mut ids = Vec::with_capacity(n);
+                let mut sorted: Vec<usize> = Vec::with_capacity(n);
+                for i in 0..n {
+                    let mut j = self.rand_below((len - i) as u64) as usize;
+                    let mut at = 0;
+                    while at < sorted.len() && j >= sorted[at] {
+                        j += 1;
+                        at += 1;
+                    }
+                    sorted.insert(at, j);
+                    ids.push(j);
+                }
+                ids
             }
             _ => {
                 // MRI copies the array and partially Fisher-Yates shuffles it

@@ -53,7 +53,9 @@ fn main() {
     std::fs::write(format!("{out}/rust-tablet.svg"), svg).unwrap();
 
     // a grille plate (seeded splits; the grille itself is keyed, not random)
-    let grille = rustergraphia::grille::Grille::new("K7Q2M-ZXB4P", rustergraphia::grille::Part::Whole).unwrap();
+    let grille =
+        rustergraphia::grille::Grille::new("K7Q2M-ZXB4P", rustergraphia::grille::Part::Whole)
+            .unwrap();
     let mut random = RubyRandom::new(55);
     let (_, svg) = cipher::inscribe(
         "the relics are under the third stone",
@@ -77,12 +79,20 @@ fn main() {
         let svg = std::fs::read_to_string(&path).unwrap();
         let layout = if name.contains("grille") {
             Some(Layout::Grille(
-                rustergraphia::grille::Grille::new("K7Q2M-ZXB4P", rustergraphia::grille::Part::Whole).unwrap(),
+                rustergraphia::grille::Grille::new(
+                    "K7Q2M-ZXB4P",
+                    rustergraphia::grille::Part::Whole,
+                )
+                .unwrap(),
             ))
         } else {
             None
         };
-        let passphrase = if name.contains("secret") { Some("monastery gate") } else { None };
+        let passphrase = if name.contains("secret") {
+            Some("monastery gate")
+        } else {
+            None
+        };
         match cipher::decode(&svg, passphrase, layout.as_ref()) {
             Ok(message) => println!("rust decodes {name}: {message}"),
             Err(error) => println!("rust FAILS on {name}: {error}"),
