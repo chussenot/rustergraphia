@@ -331,7 +331,6 @@ fn a_ruined_ruby_plate_rejoins_into_its_edition_and_whole_drawing() {
 }
 
 #[test]
-#[ignore = "needs the weathering wave merged (weathering::weather)"]
 fn a_weathered_broken_plate_rejoins_into_its_edition() {
     for (seed, message) in MESSAGES.iter().take(3).enumerate() {
         let mut random = RubyRandom::new(seed as i64);
@@ -356,7 +355,6 @@ fn a_weathered_broken_plate_rejoins_into_its_edition() {
 }
 
 #[test]
-#[ignore = "needs the weathering wave merged (weathering::weather)"]
 fn a_weathered_fragment_never_carries_what_was_lost() {
     let mut random = RubyRandom::new(4);
     let (sequence, svg, _, damage) = fragments::inscribe(
