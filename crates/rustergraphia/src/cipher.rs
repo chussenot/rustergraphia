@@ -99,12 +99,11 @@ pub fn read_whole(
     };
     let mut errors = Vec::new();
     for candidate in &candidates {
-        let attempt = svg::read(svg_text, candidate, Some(&strokes)).and_then(|sequence| {
-            match passphrase {
+        let attempt =
+            svg::read(svg_text, candidate, Some(&strokes)).and_then(|sequence| match passphrase {
                 Some(passphrase) => secret::decrypt(&sequence, passphrase),
                 None => decipher(&sequence, tablet_seed.as_deref()),
-            }
-        });
+            });
         match attempt {
             Ok(message) => return Ok(message),
             Err(error) if error.is_decode() => errors.push(error),
@@ -243,10 +242,7 @@ pub fn cister(
             .map(|c| value_of(*c).expect("normalize keeps only tablet characters"))
             .collect(),
     };
-    Ok(values
-        .into_iter()
-        .flat_map(|n| split(n, random))
-        .collect())
+    Ok(values.into_iter().flat_map(|n| split(n, random)).collect())
 }
 
 /// Inverse of [`encode`]: drops evil symbols and joins the pairs back, each
@@ -272,7 +268,10 @@ pub fn decipher(sequence: &[Value], tablet_seed: Option<&str>) -> Result<String>
                 None => character_of(sum),
             };
             letter.ok_or_else(|| {
-                Error::decode(format!("{} + {} is not a known character", pair[0], pair[1]))
+                Error::decode(format!(
+                    "{} + {} is not a known character",
+                    pair[0], pair[1]
+                ))
             })
         })
         .collect()
