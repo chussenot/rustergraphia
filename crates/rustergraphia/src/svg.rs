@@ -93,11 +93,7 @@ pub fn render(
 /// sign's place in it, so the same plate is always pressed the same way). A
 /// turned sign is pressed upright, then turned with its cell, as the scribe
 /// wrote it with the tablet turned.
-pub fn pressed(
-    signs: &[layout::Placed],
-    layout: &Layout,
-    damage: &Damage,
-) -> Result<Vec<String>> {
+pub fn pressed(signs: &[layout::Placed], layout: &Layout, damage: &Damage) -> Result<Vec<String>> {
     let mut outlines = Vec::new();
     for sign in signs {
         let empty = Vec::new();
@@ -212,9 +208,9 @@ fn read_cell(
     turned: bool,
     layout: &Layout,
 ) -> Result<Value> {
-    let strokes = cells.get(&(row, col)).ok_or_else(|| {
-        Error::decode(format!("Missing symbol at row {row}, column {col}"))
-    })?;
+    let strokes = cells
+        .get(&(row, col))
+        .ok_or_else(|| Error::decode(format!("Missing symbol at row {row}, column {col}")))?;
     glyphs::read(&layout::upright(strokes, row, col, turned, layout))
 }
 
@@ -222,9 +218,7 @@ fn read_cell(
 pub fn is_square(svg: &str) -> bool {
     with_document(svg, |root| {
         let width = root.attributes.get("width").cloned().unwrap_or_default();
-        root.name == "svg"
-            && !width.is_empty()
-            && Some(&width) == root.attributes.get("height")
+        root.name == "svg" && !width.is_empty() && Some(&width) == root.attributes.get("height")
     })
     .unwrap_or(false)
 }
