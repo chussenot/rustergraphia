@@ -73,7 +73,7 @@ impl RubyRandom {
             .as_chunks::<4>()
             .0
             .iter()
-            .map(|chunk| u32::from_be_bytes(*chunk))
+            .map(|&chunk| u32::from_be_bytes(chunk))
             .collect();
         words.reverse(); // least significant word first
         Self::from_words(&words)
