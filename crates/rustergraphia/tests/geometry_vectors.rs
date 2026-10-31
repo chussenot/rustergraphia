@@ -152,3 +152,27 @@ fn dimensions_and_cells_match() {
         assert_eq!(vec![row as i64, col as i64], want, "cell of {line:?}");
     }
 }
+
+/// Ruby's `Float#round(1)` as interpolated, on 2,031 values Ruby rounded
+/// itself (tests/fixtures/ruby_round1.json): every magnitude and sign,
+/// halves, and the underflow shortcut that gives -0.0036 a positive zero.
+#[test]
+fn rounding_to_a_tenth_is_rubys() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/ruby_round1.json"
+    );
+    let cases: Vec<(f64, String)> =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let wrong: Vec<_> = cases
+        .iter()
+        .filter(|(value, want)| rustergraphia::stylus::round1_as_ruby(*value) != *want)
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "{} of {} differ: {:?}",
+        wrong.len(),
+        cases.len(),
+        &wrong[..wrong.len().min(5)]
+    );
+}

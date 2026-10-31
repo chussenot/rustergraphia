@@ -1285,30 +1285,10 @@ pub mod tray {
 
     /// A slight tilt, never so much that a corner reaches the next fragment.
     fn tilt(width: i32, height: i32, random: &mut RubyRandom) -> String {
-        let limit = (f64::from(GAP) / 3.0)
-            .atan2(f64::from(width.max(height)))
-            .to_degrees();
-        round1(random.rand_float_incl(-1.0, 1.0) * TILT.min(limit))
-    }
-
-    /// Ruby's `Float#round(1)` and `to_s`, as the stylus formats its
-    /// coordinates (kept local: the stylus keeps its own private).
-    fn round1(x: f64) -> String {
-        let xs = x * 10.0;
-        let mut f = xs.round();
-        if x > 0.0 {
-            if (f + 0.5) / 10.0 <= x {
-                f += 1.0;
-            }
-        } else if (f - 0.5) / 10.0 >= x {
-            f -= 1.0;
-        }
-        let rounded = f / 10.0;
-        if rounded == rounded.trunc() {
-            format!("{rounded:.1}")
-        } else {
-            format!("{rounded}")
-        }
+        // `* 180 / PI` as Ruby computes it, not `to_degrees` (180 / PI first)
+        let limit = (f64::from(GAP) / 3.0).atan2(f64::from(width.max(height))) * 180.0
+            / std::f64::consts::PI;
+        crate::stylus::round1_as_ruby(random.rand_float_incl(-1.0, 1.0) * TILT.min(limit))
     }
 
     /// A fragment's clay: its box, every edge worn.
