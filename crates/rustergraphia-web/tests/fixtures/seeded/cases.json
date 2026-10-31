@@ -1,0 +1,23 @@
+[
+  {"name": "seeded_phaistos", "seed": 3, "form": {"message": "Ora et labora"}},
+  {"name": "seeded_plain_game", "seed": 4, "form": {"message": "ora et labora"}},
+  {"name": "seeded_rongorongo", "seed": 5, "form": {"message": "ora et labora", "layout": "rongorongo"}},
+  {"name": "seeded_leap", "seed": 6, "form": {"message": "ora et labora", "layout": "leap"}},
+  {"name": "seeded_furrows", "seed": 7, "form": {"message": "ora et labora", "layout": "furrows"}},
+  {"name": "seeded_unwinding", "seed": 8, "form": {"message": "ora et labora", "layout": "unwinding"}},
+  {"name": "seeded_grille", "seed": 9, "form": {"message": "Ora et labora", "layout": "grille", "grille": "k7q2m zxb4p"}},
+  {"name": "seeded_large", "seed": 10, "form": {"message": "Meet me at the old abbey after vespers, under the cloister arches by the well"}},
+  {"name": "seeded_tiny", "seed": 11, "form": {"message": "Ora"}},
+  {"name": "seeded_escaped", "seed": 12, "form": {"message": "hi <script>alert(1)</script> & \"q\" 's'"}},
+  {"name": "seeded_pathless", "seed": 13, "form": {"message": "ora et labora", "layout": "leap", "path": "withheld"}},
+  {"name": "seeded_worn", "seed": 14, "form": {"message": "the brothers will gather in the chapter house", "condition": "worn"}},
+  {"name": "seeded_worn_rongorongo", "seed": 15, "form": {"message": "the brothers will gather in the chapter house", "condition": "worn", "layout": "rongorongo"}},
+  {"name": "seeded_worn_unwinding", "seed": 16, "form": {"message": "the brothers will gather in the chapter house", "condition": "worn", "layout": "unwinding"}},
+  {"name": "seeded_worn_grille", "seed": 17, "form": {"message": "the brothers will gather", "condition": "worn", "layout": "grille", "grille": "K7Q2M-ZXB4P"}},
+  {"name": "seeded_worn_pathless", "seed": 18, "form": {"message": "the brothers will gather in the chapter house", "condition": "worn", "path": "withheld", "layout": "furrows"}},
+  {"name": "seeded_worn_small", "seed": 19, "form": {"message": "ora et labora", "condition": "worn"}},
+  {"name": "seeded_broken", "seed": 20, "form": {"message": "the brothers will gather in the chapter house", "condition": "broken"}},
+  {"name": "seeded_broken_small", "seed": 21, "form": {"message": "ora et labora", "condition": "broken"}},
+  {"name": "seeded_ruined", "seed": 22, "form": {"message": "the brothers will gather in the chapter house", "condition": "ruined"}},
+  {"name": "seeded_ruined_small", "seed": 23, "form": {"message": "ora et labora", "condition": "ruined"}}
+]

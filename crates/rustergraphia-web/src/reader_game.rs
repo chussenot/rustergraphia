@@ -257,61 +257,11 @@ pub fn scribe_answer(svg_text: &str, params: &crate::form::Params) -> Result<Str
     Ok(format!("{{{}}}", pairs.join(",")))
 }
 
-/// `[pencil, inked]` from the page's JSON, parsed as Ruby does.
+/// `[pencil, inked]` from the page's JSON, parsed as Ruby does
+/// (notebook_sent.rs).
 fn notebook_sent(
     params: &crate::form::Params,
 ) -> Result<(std::collections::BTreeMap<Value, char>, Vec<Value>), AppError> {
-    let problem = || AppError::Domain("The notebook could not be read: ask again".to_string());
-    let pencil_value: serde_json::Value =
-        serde_json::from_str(params.get("pencil")).map_err(|_| problem())?;
-    let mut pencil = std::collections::BTreeMap::new();
-    match pencil_value {
-        serde_json::Value::Null => {}
-        serde_json::Value::Object(object) => {
-            for (key, value) in object {
-                let sum = lenient_integer(&key).ok_or_else(problem)?;
-                let text = match value {
-                    serde_json::Value::String(text) => text,
-                    other => other.to_string(),
-                };
-                pencil.insert(sum, text.chars().next().unwrap_or('\0'));
-            }
-        }
-        serde_json::Value::Array(items) => {
-            // `[]` is Ruby's to_h over an empty array; pairs would raise
-            if !items.is_empty() {
-                return Err(problem());
-            }
-        }
-        _ => return Err(problem()),
-    }
-    let inked_value: serde_json::Value =
-        serde_json::from_str(params.get("inked")).map_err(|_| problem())?;
-    let inked = match inked_value {
-        serde_json::Value::Array(items) => items
-            .into_iter()
-            .map(|item| match item {
-                serde_json::Value::Number(number) => {
-                    number.as_i64().map(|n| n as Value).ok_or_else(problem)
-                }
-                serde_json::Value::String(text) => lenient_integer(&text).ok_or_else(problem),
-                _ => Err(problem()),
-            })
-            .collect::<Result<Vec<Value>, AppError>>()?,
-        serde_json::Value::Object(map) if map.is_empty() => Vec::new(),
-        _ => return Err(problem()),
-    };
-    Ok((pencil, inked))
-}
-
-/// Ruby's `Integer(text)` for the notebook's keys: decimal, surrounding
-/// whitespace allowed.
-fn lenient_integer(text: &str) -> Option<Value> {
-    text.trim().parse::<i64>().ok().and_then(|n| {
-        if (0..=i64::from(u32::MAX)).contains(&n) {
-            Some(n as Value)
-        } else {
-            None
-        }
-    })
+    crate::notebook_sent::read(params.get("pencil"), params.get("inked"))
+        .ok_or_else(|| AppError::Domain("The notebook could not be read: ask again".to_string()))
 }

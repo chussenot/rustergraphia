@@ -1,11 +1,13 @@
 //! The chapter rake tasks (web/chapter_check.rb, Rakefile): every text under
 //! every rung, and the days of new readings left.
 
+use chrono::NaiveDate;
 use rustergraphia::cipher;
 use rustergraphia::layout::Layout;
 
 use crate::chapter::{self, Day, Rung};
 
+/// `Chapter::WEEK.values`, in its order: Monday's rung to Sunday's.
 const RUNGS: [(Rung, Option<Layout>); 7] = [
     (Rung::Intact, Some(Layout::Phaistos)),
     (Rung::Worn, None),
@@ -20,34 +22,7 @@ const RUNGS: [(Rung, Option<Layout>); 7] = [
 /// of them read, 1 (with the troubles on stderr) when any would not.
 pub fn check(days: i64) -> i32 {
     let from = chapter::today().max(chapter::first());
-    let mut troubles = Vec::new();
-    let texts = chapter::all_texts();
-    let mut i = 0i64;
-    for (text, source) in &texts {
-        for (rung, layout) in &RUNGS {
-            let date = from + chrono::Duration::days(i);
-            let day = Day {
-                number: 0,
-                date,
-                rung: *rung,
-                layout: layout.clone().unwrap_or_else(|| chapter::way_of(date)),
-                text: text.clone(),
-                source: source.clone(),
-                feast: None,
-            };
-            if let Some(trouble) = read_trouble(&day, "A trial") {
-                troubles.push(trouble);
-            }
-            i += 1;
-        }
-    }
-    for i in 0..days {
-        let day = chapter::set(from + chrono::Duration::days(i));
-        let label = format!("Chapter {}, {}", day.number, day.date.format("%Y-%m-%d"));
-        if let Some(trouble) = read_trouble(&day, &label) {
-            troubles.push(trouble);
-        }
-    }
+    let troubles = troubles(days, from, &chapter::all_texts());
     if troubles.is_empty() {
         println!("Every text reads under every rung, and the next {days} days are set.");
         return 0;
@@ -59,9 +34,42 @@ pub fn check(days: i64) -> i32 {
     1
 }
 
-fn read_trouble(day: &Day, label: &str) -> Option<String> {
+/// What would not do (`Chapter::Check.check`), as lines to print: every
+/// text under every rung, each on a day of its own (its own seed), then the
+/// days ahead as they are set.
+pub fn troubles(days: i64, from: NaiveDate, texts: &[(String, String)]) -> Vec<String> {
+    let mut trials = Vec::new();
+    for (text, source) in texts {
+        for (rung, layout) in &RUNGS {
+            let date = from + chrono::Duration::days(trials.len() as i64);
+            trials.push(Day {
+                number: 0,
+                date,
+                rung: *rung,
+                layout: layout.clone().unwrap_or_else(|| chapter::way_of(date)),
+                text: text.clone(),
+                source: source.clone(),
+                feast: None,
+            });
+        }
+    }
+    let ahead = (0..days).map(|i| chapter::set(from + chrono::Duration::days(i)));
+    trials
+        .into_iter()
+        .chain(ahead)
+        .filter_map(|day| trouble(&day))
+        .collect()
+}
+
+/// Why a chapter's plate does not read back as its text, or None.
+pub fn trouble(day: &Day) -> Option<String> {
+    let named = if day.number > 0 {
+        format!("Chapter {}, {}", day.number, day.date.format("%Y-%m-%d"))
+    } else {
+        "A trial".to_string()
+    };
     let label = format!(
-        "{label} ({}, {}): {}",
+        "{named} ({}, {}): {}",
         day.rung.name(),
         day.layout.name(),
         day.text
@@ -78,23 +86,32 @@ fn read_trouble(day: &Day, label: &str) -> Option<String> {
     }
 }
 
-/// Whether an edition can read as a text: each token's options hold the
-/// text's character at its place.
-fn holds(edition: &str, text: &str) -> bool {
+/// Whether an edition holds a text: each letter as it stands, or among a
+/// bracket's (`[r]` restored, `[b/l]` for the words to decide). Read as the
+/// Ruby scan `/\[([^\]]*)\]|([^\[])/` reads it: a `[` that no `]` closes is
+/// passed over.
+pub fn holds(edition: &str, text: &str) -> bool {
+    let chars: Vec<char> = edition.chars().collect();
     let mut tokens: Vec<Vec<String>> = Vec::new();
-    let mut chars = edition.chars().peekable();
-    while let Some(c) = chars.next() {
-        if c == '[' {
-            let mut inner = String::new();
-            for next in chars.by_ref() {
-                if next == ']' {
-                    break;
+    let mut at = 0;
+    while at < chars.len() {
+        if chars[at] == '[' {
+            match chars[at + 1..].iter().position(|&c| c == ']') {
+                Some(end) => {
+                    let inner: String = chars[at + 1..at + 1 + end].iter().collect();
+                    // Ruby's "".split('/', -1) is [], not [""]
+                    tokens.push(if inner.is_empty() {
+                        Vec::new()
+                    } else {
+                        inner.split('/').map(str::to_string).collect()
+                    });
+                    at += end + 2;
                 }
-                inner.push(next);
+                None => at += 1,
             }
-            tokens.push(inner.split('/').map(str::to_string).collect());
         } else {
-            tokens.push(vec![c.to_string()]);
+            tokens.push(vec![chars[at].to_string()]);
+            at += 1;
         }
     }
     let text_chars: Vec<String> = text.chars().map(|c| c.to_string()).collect();
@@ -132,5 +149,11 @@ mod tests {
         assert!(holds("a[ ]b", "a b"));
         assert!(!holds("ab", "abc"));
         assert!(!holds("[x/y]", "z"));
+    }
+
+    #[test]
+    fn an_unclosed_bracket_is_passed_over_as_the_ruby_scan_does() {
+        assert!(holds("ab[c", "abc"));
+        assert!(!holds("a[]b", "ab"));
     }
 }

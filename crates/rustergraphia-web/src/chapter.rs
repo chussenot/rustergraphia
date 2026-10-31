@@ -81,7 +81,27 @@ struct Feast {
 #[derive(Debug, serde::Deserialize)]
 struct Texts {
     readings: Vec<Reading>,
-    feasts: std::collections::BTreeMap<String, Feast>,
+    /// In the file's order (Ruby's Hash keeps it): `Check` tries the feasts
+    /// in this order, each on a day, a seed, of its own.
+    #[serde(deserialize_with = "in_order")]
+    feasts: Vec<(String, Feast)>,
+}
+
+fn in_order<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<(String, Feast)>, D::Error> {
+    let mapping: serde_yaml::Mapping = serde::Deserialize::deserialize(deserializer)?;
+    mapping
+        .into_iter()
+        .map(|(day, feast)| {
+            let day = day
+                .as_str()
+                .ok_or_else(|| serde::de::Error::custom("a feast's day is a string"))?
+                .to_string();
+            let feast = serde_yaml::from_value(feast).map_err(serde::de::Error::custom)?;
+            Ok((day, feast))
+        })
+        .collect()
 }
 
 fn texts() -> &'static Texts {
@@ -91,16 +111,74 @@ fn texts() -> &'static Texts {
     &TEXTS
 }
 
+fn feast_of(day: &str) -> Option<&'static Feast> {
+    texts()
+        .feasts
+        .iter()
+        .find(|(kept, _)| kept == day)
+        .map(|(_, feast)| feast)
+}
+
+/// The reading order (chapters.yml `readings`), as `(text, source)`.
+pub fn readings() -> Vec<(&'static str, &'static str)> {
+    texts()
+        .readings
+        .iter()
+        .map(|reading| (reading.text.as_str(), reading.source.as_str()))
+        .collect()
+}
+
+/// The feasts (chapters.yml `feasts`), in the file's order, as
+/// `(month-day, name, text, source)`.
+pub fn feasts() -> Vec<(&'static str, &'static str, &'static str, &'static str)> {
+    texts()
+        .feasts
+        .iter()
+        .map(|(day, feast)| {
+            (
+                day.as_str(),
+                feast.name.as_str(),
+                feast.text.as_str(),
+                feast.source.as_str(),
+            )
+        })
+        .collect()
+}
+
 pub fn readings_len() -> usize {
     texts().readings.len()
 }
 
-/// Today's date, as the chapter counts it. CHAPTER_DATE (2026-11-01) sets
-/// another: a rehearsal of a day to come.
+thread_local! {
+    /// The date a request was configured to count as today (Config's
+    /// chapter_date), for the closure [`on`] runs.
+    static TODAY: std::cell::Cell<Option<NaiveDate>> = const { std::cell::Cell::new(None) };
+}
+
+/// Runs `f` with `date` counted as today on this thread (None: as before),
+/// then restores what was.
+pub fn on<R>(date: Option<NaiveDate>, f: impl FnOnce() -> R) -> R {
+    struct Restore(Option<NaiveDate>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            TODAY.with(|cell| cell.set(self.0));
+        }
+    }
+    let _restore = Restore(TODAY.with(|cell| cell.replace(date.or(cell.get()))));
+    f()
+}
+
+/// Today's date, as the chapter counts it: the date [`on`] set, else
+/// CHAPTER_DATE (2026-11-01, a rehearsal of a day to come), else the clock's
+/// at midnight UTC.
 pub fn today() -> NaiveDate {
-    std::env::var("CHAPTER_DATE")
-        .ok()
-        .and_then(|text| parse(&text))
+    TODAY
+        .with(std::cell::Cell::get)
+        .or_else(|| {
+            std::env::var("CHAPTER_DATE")
+                .ok()
+                .and_then(|text| parse(&text))
+        })
         .unwrap_or_else(|| Utc::now().date_naive())
 }
 
@@ -116,7 +194,7 @@ pub fn of(date: NaiveDate) -> Option<Day> {
 /// The chapter a date sets, written or not (the checks look ahead).
 pub fn set(date: NaiveDate) -> Day {
     let index = (date - first()).num_days();
-    let feast = texts().feasts.get(&date.format("%m-%d").to_string());
+    let feast = feast_of(&date.format("%m-%d").to_string());
     let (text, source) = match feast {
         Some(feast) => (feast.text.clone(), feast.source.clone()),
         None => {
@@ -199,7 +277,7 @@ pub fn all_texts() -> Vec<(String, String)> {
 }
 
 fn texts_feasts() -> impl Iterator<Item = &'static Feast> {
-    texts().feasts.values()
+    texts().feasts.iter().map(|(_, feast)| feast)
 }
 
 /// The day's plate, as the page shows it (PlateFile.clean, as a file brought
@@ -269,7 +347,11 @@ pub fn seeded(date: NaiveDate, purpose: &str) -> RubyRandom {
 
 /// Seconds until the day turns: how long today's chapter may be kept.
 pub fn seconds_left() -> i64 {
-    let now = Utc::now();
+    seconds_left_at(Utc::now())
+}
+
+/// Seconds from `now` until the day turns.
+pub fn seconds_left_at(now: chrono::DateTime<Utc>) -> i64 {
     let tomorrow = now.date_naive() + chrono::Duration::days(1);
     let midnight = tomorrow.and_hms_opt(0, 0, 0).expect("midnight");
     (midnight.and_utc().timestamp() - now.timestamp()).clamp(1, 86_400)

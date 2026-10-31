@@ -39,46 +39,56 @@ impl Params {
     }
 
     /// Parse an application/x-www-form-urlencoded body or query string into
-    /// this set (later keys win).
-    pub fn parse_urlencoded(&mut self, text: &[u8]) {
+    /// this set (later keys win). A name or value whose `%` is not followed
+    /// by two hex digits stops the parse, as Rack's does: the error is
+    /// Rack's message, `invalid %-encoding (<the component as sent>)`.
+    pub fn parse_urlencoded(&mut self, text: &[u8]) -> Result<(), String> {
         for pair in text.split(|&b| b == b'&') {
             if pair.is_empty() {
                 continue;
             }
             let mut sides = pair.splitn(2, |&b| b == b'=');
-            let name = decode_component(sides.next().unwrap_or_default());
-            let value = decode_component(sides.next().unwrap_or_default());
+            let name = decode_component(sides.next().unwrap_or_default())?;
+            let value = decode_component(sides.next().unwrap_or_default())?;
             if !name.is_empty() {
                 self.values.insert(name, value);
             }
         }
+        Ok(())
     }
 }
 
-/// Percent-decoding with `+` as space, invalid sequences kept literally,
-/// lossy UTF-8 (as Rack tolerates).
-pub fn decode_component(text: &[u8]) -> String {
+/// `URI.decode_www_form_component`: `+` as space, `%XX` as its byte, lossy
+/// UTF-8; a `%` without two hex digits after it is refused with Ruby's
+/// message.
+pub fn decode_component(text: &[u8]) -> Result<String, String> {
     let mut out = Vec::with_capacity(text.len());
-    let mut bytes = text.iter().copied().peekable();
-    while let Some(b) = bytes.next() {
-        match b {
+    let mut at = 0;
+    while at < text.len() {
+        match text[at] {
             b'+' => out.push(b' '),
             b'%' => {
-                let hex: Vec<u8> = bytes.clone().take(2).collect();
-                if hex.len() == 2 && hex.iter().all(u8::is_ascii_hexdigit) {
-                    let value = u8::from_str_radix(std::str::from_utf8(&hex).unwrap_or("0"), 16)
-                        .unwrap_or(b'%');
-                    out.push(value);
-                    bytes.next();
-                    bytes.next();
-                } else {
-                    out.push(b'%');
-                }
+                let hex = text
+                    .get(at + 1..at + 3)
+                    .filter(|hex| hex.iter().all(u8::is_ascii_hexdigit));
+                let Some(hex) = hex else {
+                    return Err(format!(
+                        "invalid %-encoding ({})",
+                        String::from_utf8_lossy(text)
+                    ));
+                };
+                let value = std::str::from_utf8(hex)
+                    .ok()
+                    .and_then(|hex| u8::from_str_radix(hex, 16).ok())
+                    .expect("two hex digits");
+                out.push(value);
+                at += 2;
             }
             other => out.push(other),
         }
+        at += 1;
     }
-    String::from_utf8_lossy(&out).into_owned()
+    Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
 /// The mode switch wins when present; otherwise a non-blank passphrase means

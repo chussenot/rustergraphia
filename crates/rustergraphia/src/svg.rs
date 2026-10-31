@@ -379,9 +379,25 @@ fn line_of(element: &xmltree::Element) -> Result<Line> {
     Ok(line)
 }
 
+/// The file's root element, read as REXML reads it: an empty file is a
+/// document with no root (not an SVG document, as the readers then say),
+/// and a second root element makes the file malformed (xmltree's
+/// `Element::parse` would keep the first and drop the rest).
 pub fn parse(svg: &str) -> Result<xmltree::Element> {
-    xmltree::Element::parse(svg.as_bytes())
-        .map_err(|_| Error::decode("Unreadable SVG: not well-formed XML"))
+    let unreadable = || Error::decode("Unreadable SVG: not well-formed XML");
+    if svg.is_empty() {
+        return Err(Error::decode("Not an SVG document"));
+    }
+    let nodes = xmltree::Element::parse_all(svg.as_bytes()).map_err(|_| unreadable())?;
+    let mut roots = nodes.into_iter().filter_map(|node| match node {
+        xmltree::XMLNode::Element(element) => Some(element),
+        _ => None,
+    });
+    let root = roots.next().ok_or_else(unreadable)?;
+    if roots.next().is_some() {
+        return Err(unreadable());
+    }
+    Ok(root)
 }
 
 pub fn coordinate(value: Option<&str>) -> Result<i32> {

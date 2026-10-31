@@ -45,14 +45,45 @@ static CHAPTER_PAGES: LazyLock<Kept> = LazyLock::new(Kept::new);
 
 /// The whole routed app: called with the cleaned path, inside one blocking
 /// closure per request; the library's per-thread parse cache is let go at
-/// the end of every path.
-pub fn route(method: &str, path: &str, params: &mut Params, base_url: &str) -> Page {
-    let page = dispatch(method, path, params, base_url);
+/// the end of every path, a bug's too. The config's chapter date counts as
+/// today for the whole request.
+pub fn route(
+    method: &str,
+    path: &str,
+    params: &mut Params,
+    base_url: &str,
+    config: &crate::Config,
+) -> Page {
+    let page = chapter::on(config.chapter_date, || {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            dispatch(method, path, params, base_url, config.plate_seed)
+        }))
+    });
     rustergraphia::svg::forget();
-    page
+    page.unwrap_or_else(|_| bug_page(base_url, path))
 }
 
-fn dispatch(method: &str, path: &str, params: &mut Params, base_url: &str) -> Page {
+/// A real bug (Sinatra's `error do`): the Erratum, 500, never the panic's
+/// own words.
+pub fn bug_page(base_url: &str, path: &str) -> Page {
+    erratum(
+        &AppError::Bug,
+        Frame {
+            base_url: base_url.to_string(),
+            path: path.to_string(),
+            ..Frame::default()
+        },
+        false,
+    )
+}
+
+fn dispatch(
+    method: &str,
+    path: &str,
+    params: &mut Params,
+    base_url: &str,
+    plate_seed: Option<i64>,
+) -> Page {
     let get = method == "GET" || method == "HEAD";
     match (method, path) {
         _ if get && path == "/up" => Page {
@@ -63,7 +94,7 @@ fn dispatch(method: &str, path: &str, params: &mut Params, base_url: &str) -> Pa
             x_cascade: false,
         },
         _ if get && path == "/" => index_page(base_url),
-        ("POST", "/generate") => generate(params, base_url),
+        ("POST", "/generate") => generate(params, base_url, plate_seed),
         _ if get && path == "/decode" => decode_form(base_url),
         _ if get && path == "/about" => about_page(base_url),
         ("POST", "/decode") => decode_post(params, base_url),
@@ -164,7 +195,7 @@ fn about_page(base_url: &str) -> Page {
 }
 
 /// POST /generate, in the Ruby route's exact order.
-fn generate(params: &Params, base_url: &str) -> Page {
+fn generate(params: &Params, base_url: &str, plate_seed: Option<i64>) -> Page {
     let mut frame = frame(base_url, "/generate", "inscribe");
     let message = params.get("message").to_string();
     if message.chars().count() > form::MAX_MESSAGE_LENGTH {
@@ -268,6 +299,7 @@ fn generate(params: &Params, base_url: &str) -> Page {
         broken,
         pathless,
         own_tablet,
+        plate_seed,
     );
     let plate = match inscribed {
         Ok(plate) => plate,
@@ -314,8 +346,12 @@ fn inscribe_plate(
     broken: bool,
     pathless: bool,
     own_tablet: bool,
+    plate_seed: Option<i64>,
 ) -> Result<Inscribed, AppError> {
-    let mut random = rustergraphia::RubyRandom::new_os();
+    let mut random = match plate_seed {
+        Some(seed) => rustergraphia::RubyRandom::new(seed),
+        None => rustergraphia::RubyRandom::new_os(),
+    };
     if broken {
         let (sequence, svg, pieces, damage) =
             fragments::inscribe(message, layout, weathered, &mut random)?;

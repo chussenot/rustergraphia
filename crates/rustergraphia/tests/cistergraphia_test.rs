@@ -521,3 +521,42 @@ fn decipher_rejects_sequences_that_are_not_characters() {
         assert!(error.is_decode(), "{sequence:?}");
     }
 }
+
+/// What REXML (the Ruby library's parser) makes of a file that is not one
+/// plate: an empty file is a document with no root, so "Not an SVG
+/// document"; a second root element is malformed, as is text around the
+/// root; comments, processing instructions and whitespace around it are not.
+#[test]
+fn a_file_is_read_as_rexml_reads_it() {
+    let message = |svg_text: &str| {
+        cipher::decode(svg_text, None, None)
+            .unwrap_err()
+            .to_string()
+    };
+    assert_eq!("Not an SVG document", message(""));
+    for unreadable in [
+        " ",
+        "<svg/><svg/>",
+        "<svg/>hello",
+        "hello<svg/>",
+        "<!--c-->",
+    ] {
+        assert_eq!(
+            "Unreadable SVG: not well-formed XML",
+            message(unreadable),
+            "{unreadable:?}"
+        );
+    }
+    for one_root in [
+        "<svg/><!--c-->",
+        "<!--c--><svg/>  \n",
+        "<?xml version=\"1.0\"?><svg/><?pi x?>",
+    ] {
+        assert_eq!(
+            "No signs found on this plate",
+            message(one_root),
+            "{one_root:?}"
+        );
+    }
+    assert_eq!("svg", svg::parse("<svg/>\n").unwrap().name);
+}

@@ -146,7 +146,7 @@ fn lede(state: &ResultState) -> String {
                 "Secret mode: sealed with your passphrase. Without it, this plate reveals nothing but its length.".to_string()
             } else if state.normalized != state.message {
                 return format!(
-                    "  <p class=\"lede\">Enciphered as: <code>{}</code></p>\n",
+                    "    <p class=\"lede\">Enciphered as: <code>{}</code></p>\n",
                     h(&state.normalized)
                 );
             } else {
@@ -154,7 +154,7 @@ fn lede(state: &ResultState) -> String {
             }
         }
     };
-    format!("  <p class=\"lede\">{text}</p>\n")
+    format!("    <p class=\"lede\">{text}</p>\n")
 }
 
 fn specs(state: &ResultState, size: usize) -> String {
