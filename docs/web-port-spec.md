@@ -1422,3 +1422,14 @@ Open questions:
 - Should the Rust server also serve the Ruby CLI-only features (`tally` on the form)? (Ruby: no.)
 - Production bind address/port (Ruby Docker uses `PORT=8080`) and whether `WEB_CONCURRENCY`/
   `PUMA_THREADS` map to a concurrency limit.
+
+## 16. Decisions taken in the port
+
+| # | Question (§15) | Decision | Why |
+|---|---|---|---|
+| 4 | `POST /decode` cache-control | **Deviate: `no-store`** on every POST (`/decode`, `/ask`, `/generate`, `/chapter/<date>`); GET/HEAD keep Ruby's cache rules. | The response carries the decoded message. A shared cache keeping it for five minutes is a privacy leak, and `docs/serving.md` in the original already promises "anything posted: no-store". The golden suite masks this one header on those responses and nothing else. Worth fixing upstream in `web/leaf_headers.rb`. |
+| 5 | Escaped `aria-invalid=&quot;true&quot;` | **Replicate** for byte parity (commented at the template). | Harmless to assistive tech in practice (the attribute is malformed, so ignored either way); fix in both codebases together. |
+| 9 | `/ask` error content-type | **Replicate** (HTML Erratum under `application/json`). | The page script only checks `response.ok`. |
+| 10 | Rack param edge cases | **Out of scope.** | No honest client sends them. |
+| 15 | Float formatting in figures | Ruby `Float#round(1)`/`to_s` reproduced (`50.0`). | Byte parity; the stylus rounding rules are shared. |
+| — | Bind address/port | `PORT` env (default 9292), all interfaces. | Matches `rackup` locally and the Docker image's `PORT` convention. |
