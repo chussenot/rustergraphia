@@ -215,8 +215,8 @@ pub fn inscribe(
             Damage::new()
         };
         let pieces = breaking::cut(size, random);
-        let svg_text = tray::render(&sequence, layout, &pieces, random, &damage)?;
-        if join::all(&read(&svg_text)?, &layout::KEYLESS)?.len() == 1 {
+        let (svg_text, fragments) = tray::drawn(&sequence, layout, &pieces, random, &damage)?;
+        if join::all(&fragments, &layout::KEYLESS)?.len() == 1 {
             return Ok((sequence, svg_text, pieces, damage));
         }
     }
@@ -422,9 +422,15 @@ pub mod reading {
         }
         let seen = layout::upright(strokes, row, col, false, &Layout::Phaistos);
         let gone = layout::upright(lost, row, col, false, &Layout::Phaistos);
+        reading_of(&seen, &gone)
+    }
+
+    /// A sign's readings from its strokes and lost positions, relative to
+    /// the sign as it lies: what `readings` finds in the file's lines.
+    pub fn reading_of(seen: &[Line], gone: &[Line]) -> Result<CellReading> {
         Ok(CellReading {
-            upright: candidates(&seen, &gone)?,
-            turned: candidates(&turned(&seen), &turned(&gone))?,
+            upright: candidates(seen, gone)?,
+            turned: candidates(&turned(seen), &turned(gone))?,
             worn: !gone.is_empty(),
         })
     }
@@ -1140,20 +1146,66 @@ pub mod tray {
         random: &mut RubyRandom,
         damage: &Damage,
     ) -> Result<String> {
+        Ok(drawn(sequence, layout, pieces, random, damage)?.0)
+    }
+
+    /// The document, and its fragments as `read` would read them back:
+    /// whether a new plate rejoins one way only is asked of the fragments it
+    /// was drawn from, not of its file (reading the file back cost several
+    /// times the search). The tray is drawn all the same, before the
+    /// question: it takes from the random, and a seeded plate stays the same.
+    pub fn drawn(
+        sequence: &[Value],
+        layout: &Layout,
+        pieces: &[Piece],
+        random: &mut RubyRandom,
+        damage: &Damage,
+    ) -> Result<(String, Vec<Fragment>)> {
         let size = sequence.len().isqrt();
         let mut tray = tray_below(size, layout);
-        let fragments = lay(pieces, sequence, damage, layout, &mut tray, random)?;
+        let laid = lay(pieces, sequence, damage, layout, &mut tray, random)?;
         let defs = if damage.is_empty() {
             board(size, layout)
         } else {
             format!("  {}\n{}", lacunae::PATTERN, board(size, layout))
         };
-        Ok(document(
-            tray.room + 2 * BOARD,
-            tray.bottom + BOARD,
-            &defs,
-            &fragments,
-        ))
+        let markup: Vec<String> = laid.iter().map(|(markup, _)| markup.clone()).collect();
+        let fragments = laid
+            .iter()
+            .map(|(_, signs)| fragment_of(signs))
+            .collect::<Result<Vec<_>>>()?;
+        let document = document(tray.room + 2 * BOARD, tray.bottom + BOARD, &defs, &markup);
+        Ok((document, fragments))
+    }
+
+    /// The fragment `reading::fragment` reads from a group, from the signs
+    /// the group was drawn from: their surviving strokes and lost positions,
+    /// turned as each sign lies.
+    fn fragment_of(signs: &[Sign]) -> Result<Fragment> {
+        let mut readings = BTreeMap::new();
+        let mut lost = BTreeMap::new();
+        for sign in signs {
+            let gone: Vec<Line> = sign
+                .lost
+                .iter()
+                .map(|&stroke| {
+                    if sign.turned {
+                        glyphs::turn(stroke)
+                    } else {
+                        stroke
+                    }
+                })
+                .collect();
+            readings.insert(
+                (sign.row, sign.col),
+                reading::reading_of(&sign.strokes(), &gone)?,
+            );
+            lost.insert(
+                (sign.row, sign.col),
+                gone.into_iter().map(glyphs::canonical).collect(),
+            );
+        }
+        Ok(Fragment::of(readings, lost))
     }
 
     fn tray_below(size: usize, layout: &Layout) -> Skyline {
@@ -1173,22 +1225,18 @@ pub mod tray {
         layout: &Layout,
         tray: &mut Skyline,
         random: &mut RubyRandom,
-    ) -> Result<Vec<String>> {
+    ) -> Result<Vec<(String, Vec<Sign>)>> {
         let where_ = reading_order(sequence.len().isqrt(), layout)?;
         let mut shuffled = pieces.to_vec();
         random.shuffle(&mut shuffled);
         shuffled.sort_by_key(|piece| -piece.rows); // stable: shuffled order among equals
-        shuffled
+        Ok(shuffled
             .iter()
             .map(|piece| {
-                Ok(fragment(
-                    boxed(piece, layout),
-                    &signs(piece, sequence, damage, &where_),
-                    tray,
-                    random,
-                ))
+                let signs = signs(piece, sequence, damage, &where_);
+                (fragment(boxed(piece, layout), &signs, tray, random), signs)
             })
-            .collect()
+            .collect())
     }
 
     /// `(row, col)` => `(reading index, turned)`.
@@ -1285,30 +1333,10 @@ pub mod tray {
 
     /// A slight tilt, never so much that a corner reaches the next fragment.
     fn tilt(width: i32, height: i32, random: &mut RubyRandom) -> String {
-        let limit = (f64::from(GAP) / 3.0)
-            .atan2(f64::from(width.max(height)))
-            .to_degrees();
-        round1(random.rand_float_incl(-1.0, 1.0) * TILT.min(limit))
-    }
-
-    /// Ruby's `Float#round(1)` and `to_s`, as the stylus formats its
-    /// coordinates (kept local: the stylus keeps its own private).
-    fn round1(x: f64) -> String {
-        let xs = x * 10.0;
-        let mut f = xs.round();
-        if x > 0.0 {
-            if (f + 0.5) / 10.0 <= x {
-                f += 1.0;
-            }
-        } else if (f - 0.5) / 10.0 >= x {
-            f -= 1.0;
-        }
-        let rounded = f / 10.0;
-        if rounded == rounded.trunc() {
-            format!("{rounded:.1}")
-        } else {
-            format!("{rounded}")
-        }
+        // `* 180 / PI` as Ruby computes it, not `to_degrees` (180 / PI first)
+        let limit = (f64::from(GAP) / 3.0).atan2(f64::from(width.max(height))) * 180.0
+            / std::f64::consts::PI;
+        crate::stylus::round1_as_ruby(random.rand_float_incl(-1.0, 1.0) * TILT.min(limit))
     }
 
     /// A fragment's clay: its box, every edge worn.

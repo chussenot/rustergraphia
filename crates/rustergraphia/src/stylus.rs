@@ -38,7 +38,7 @@ pub fn press(stroke: Line) -> String {
 pub fn outline(points: &[(f64, f64)], x: f64, y: f64) -> String {
     let joined = points
         .iter()
-        .map(|&(px, py)| format!("{} {}", round1(px + x), round1(py + y)))
+        .map(|&(px, py)| format!("{} {}", round1_as_ruby(px + x), round1_as_ruby(py + y)))
         .collect::<Vec<_>>()
         .join("L");
     format!("M{joined}Z")
@@ -120,14 +120,44 @@ fn at((x, y): (f64, f64), (dx, dy): (f64, f64), distance: f64) -> (f64, f64) {
 
 /// Ruby's `Float#round(1)` followed by string interpolation: one decimal at
 /// most, integral values keeping their `.0` (and -0.0 its sign), halves
-/// rounded away from zero with MRI's representation correction.
-fn round1(x: f64) -> String {
-    let rounded = round_half_up(x, 10.0) / 10.0;
+/// rounded away from zero with MRI's representation correction. A value MRI
+/// knows from its exponent alone to round to nothing is its positive zero:
+/// -0.0036 rounds to 0.0, where -0.04 rounds to -0.0.
+pub fn round1_as_ruby(x: f64) -> String {
+    let rounded = if x != 0.0 && underflows(x, 1) {
+        0.0
+    } else {
+        round_half_up(x, 10.0) / 10.0
+    };
     if rounded == rounded.trunc() {
         format!("{rounded:.1}")
     } else {
         format!("{rounded}")
     }
+}
+
+/// MRI's `float_round_underflow`: whether `x` rounded to `ndigits` decimals
+/// is surely zero, judged from its binary exponent (C's division truncating
+/// toward zero).
+fn underflows(x: f64, ndigits: i32) -> bool {
+    let binexp = frexp_exponent(x);
+    ndigits
+        < -(if binexp > 0 {
+            binexp / 3 + 1
+        } else {
+            binexp / 4
+        })
+}
+
+/// The exponent C's `frexp` gives: `x = m * 2^e` with `0.5 <= |m| < 1`.
+fn frexp_exponent(x: f64) -> i32 {
+    let bits = x.abs().to_bits();
+    let biased = ((bits >> 52) & 0x7ff) as i32;
+    if biased == 0 {
+        // subnormal: scale into the normal range first
+        return frexp_exponent(x * 2f64.powi(64)) - 64;
+    }
+    biased - 1022
 }
 
 /// MRI's `round_half_up`: round to the nearest multiple of 1/s, halves away
@@ -192,11 +222,11 @@ mod tests {
 
     #[test]
     fn rounding_matches_ruby_float_round() {
-        assert_eq!(round1(62.0), "62.0");
-        assert_eq!(round1(-0.04), "-0.0");
-        assert_eq!(round1(61.84), "61.8");
-        assert_eq!(round1(61.85), "61.9"); // IEEE 61.85 is just above the half
-        assert_eq!(round1(0.25), "0.3");
-        assert_eq!(round1(-0.25), "-0.3");
+        assert_eq!(round1_as_ruby(62.0), "62.0");
+        assert_eq!(round1_as_ruby(-0.04), "-0.0");
+        assert_eq!(round1_as_ruby(61.84), "61.8");
+        assert_eq!(round1_as_ruby(61.85), "61.9"); // IEEE 61.85 is just above the half
+        assert_eq!(round1_as_ruby(0.25), "0.3");
+        assert_eq!(round1_as_ruby(-0.25), "-0.3");
     }
 }

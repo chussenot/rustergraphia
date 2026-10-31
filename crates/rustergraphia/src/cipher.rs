@@ -10,6 +10,7 @@
 //!   without a key the decoder tries the five keyless paths, and `inscribe`
 //!   redraws any game plate that would read along more than one
 
+use crate::along;
 use crate::error::{Error, Result};
 use crate::fragments;
 use crate::grille;
@@ -159,8 +160,8 @@ pub fn inscribe(
     }
     for _ in 0..100 {
         let sequence = encode(message, passphrase, under_grille, tablet_seed, random)?;
-        let svg_text = to_svg(&sequence, layout, tally, pathless_plate, tablet_seed)?;
-        if passphrase.is_some() || under_grille || unambiguous(&svg_text, layout)? {
+        if passphrase.is_some() || under_grille || along::alone(&sequence, layout)? {
+            let svg_text = to_svg(&sequence, layout, tally, pathless_plate, tablet_seed)?;
             return Ok((sequence, svg_text));
         }
     }
