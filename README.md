@@ -48,6 +48,9 @@ This is not a look-alike: it is the same cipher, bit for bit.
   library's output, and each implementation decodes the other's plates,
   sealed ones included. `tools/interop-check.sh` proves it whenever Ruby
   and the original repository are at hand, and CI runs it on every push.
+- The web scriptorium renders the same pages: [docs/ui-proofs.md](docs/ui-proofs.md)
+  screenshots the original and the clone side by side, and 16 of 16
+  deterministic pages come out pixel-identical.
 
 Try it
 ------

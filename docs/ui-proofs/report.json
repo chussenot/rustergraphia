@@ -1,0 +1,212 @@
+{
+  "bench-tallied": {
+    "ruby_size": [
+      1280,
+      1603
+    ],
+    "rust_size": [
+      1280,
+      1603
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 2051840
+  },
+  "bench-weathered": {
+    "ruby_size": [
+      1280,
+      1667
+    ],
+    "rust_size": [
+      1280,
+      1667
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 2133760
+  },
+  "board-broken": {
+    "ruby_size": [
+      1280,
+      1855
+    ],
+    "rust_size": [
+      1280,
+      1855
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 2374400
+  },
+  "board-ruined": {
+    "ruby_size": [
+      1280,
+      1910
+    ],
+    "rust_size": [
+      1280,
+      1910
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 2444800
+  },
+  "chapter": {
+    "ruby_size": [
+      1280,
+      2051
+    ],
+    "rust_size": [
+      1280,
+      2051
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 2625280
+  },
+  "decoded-edition": {
+    "ruby_size": [
+      1280,
+      900
+    ],
+    "rust_size": [
+      1280,
+      900
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 1152000
+  },
+  "decoded-sealed": {
+    "ruby_size": [
+      1280,
+      900
+    ],
+    "rust_size": [
+      1280,
+      900
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 1152000
+  },
+  "decoded-two-readers": {
+    "ruby_size": [
+      1280,
+      900
+    ],
+    "rust_size": [
+      1280,
+      900
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 1152000
+  },
+  "desk-grille": {
+    "ruby_size": [
+      1280,
+      1548
+    ],
+    "rust_size": [
+      1280,
+      1548
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 1981440
+  },
+  "desk-pathless": {
+    "ruby_size": [
+      1280,
+      1631
+    ],
+    "rust_size": [
+      1280,
+      1631
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 2087680
+  },
+  "desk-phaistos": {
+    "ruby_size": [
+      1280,
+      1700
+    ],
+    "rust_size": [
+      1280,
+      1700
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 2176000
+  },
+  "desk-rongorongo": {
+    "ruby_size": [
+      1280,
+      1700
+    ],
+    "rust_size": [
+      1280,
+      1700
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 2176000
+  },
+  "inscribe-dark": {
+    "ruby_size": [
+      1280,
+      1371
+    ],
+    "rust_size": [
+      1280,
+      1371
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 1754880
+  },
+  "inscribe": {
+    "ruby_size": [
+      1280,
+      1371
+    ],
+    "rust_size": [
+      1280,
+      1371
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 1754880
+  },
+  "inscribed-result": {
+    "ruby_size": [
+      1280,
+      1723
+    ],
+    "rust_size": [
+      1280,
+      1723
+    ],
+    "differing_pixels": 51020,
+    "total_pixels": 2205440,
+    "diff_box": [
+      403,
+      559,
+      870,
+      1221
+    ]
+  },
+  "notebook-own-tablet": {
+    "ruby_size": [
+      1280,
+      2576
+    ],
+    "rust_size": [
+      1280,
+      2576
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 3297280
+  },
+  "read-form": {
+    "ruby_size": [
+      1280,
+      1273
+    ],
+    "rust_size": [
+      1280,
+      1273
+    ],
+    "differing_pixels": 0,
+    "total_pixels": 1629440
+  }
+}
