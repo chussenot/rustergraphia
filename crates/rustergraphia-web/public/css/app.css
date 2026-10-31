@@ -1,0 +1,1368 @@
+/*
+ * Cistergraphia — "The Abbey Index"
+ * A leaf from a Cistercian library index: vellum, iron-gall ink, ruled lines,
+ * and only the two colours Cistercian scribes allowed themselves for initials:
+ * minium red (the game) and woad blue (the sealed secret).
+ * Design notes: docs/design.md
+ */
+
+/* ---------- Type ---------- */
+@font-face {
+  font-family: "EB Garamond";
+  src: url("/fonts/eb-garamond-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "EB Garamond";
+  src: url("/fonts/eb-garamond-latin-400-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "EB Garamond";
+  src: url("/fonts/eb-garamond-latin-600-normal.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---------- Tokens ---------- */
+:root {
+  color-scheme: light dark;
+
+  --vellum: #f3ede1;      /* page */
+  --paper: #fbf8f2;       /* leaf */
+  --ink: #2b241c;         /* iron-gall ink */
+  --ink-soft: #62574a;    /* secondary text, control borders (6:1) */
+  --rule: #d9cdb6;        /* ruling lines (decorative) */
+  --rule-faint: rgb(160 132 92 / 0.09);
+  --rubric: #a3301c;      /* minium red: the game */
+  --woad: #2b4a74;        /* woad blue: the secret */
+  --clay: #e4d8c1;        /* the plate: a tablet of pale fired clay */
+  --clay-edge: #c4b08c;   /* its rim, and the hatch of a break */
+  --sheet: #f7f2e8;       /* the grille: a parchment laid on the plate */
+  --on-accent: #fbf8f2;
+  --accent: var(--rubric);  /* the current mode's colour */
+  --accent-ring: rgb(163 48 28 / 0.15);
+  --shadow: 0 1px 2px rgb(43 36 28 / 0.06), 0 12px 32px -12px rgb(43 36 28 / 0.18);
+
+  --serif: "EB Garamond", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4.5rem;
+  --radius: 3px;
+  --measure: 62ch;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  /* Motion: the pace of a scribe. Nothing loops; nothing moves without a reason */
+  --ease-ink: cubic-bezier(0.3, 0.6, 0.2, 1);
+  --dur-stroke: 260ms;   /* one stroke of the pen */
+  --dur-dry: 1100ms;     /* wet rubric ink drying to iron-gall */
+  --dur-lift: 260ms;     /* a stroke lifted away */
+  --dur-mode: 700ms;     /* the page changing ink, red <-> blue */
+  --dur-turn: 900ms;     /* a rongorongo plate turned half round */
+}
+
+/* Registered so the page can change ink slowly instead of flipping */
+@property --accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a3301c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* "Vigils": the night office, by candlelight */
+    --vellum: #191714;
+    --paper: #211e1a;
+    --ink: #ece4d4;
+    --ink-soft: #b3a894;
+    --rule: #3b352d;
+    --rule-faint: rgb(236 228 212 / 0.035);
+    --rubric: #e8826b;
+    --woad: #93b3e3;
+    --clay: #3a3229;
+    --clay-edge: #5a4b3b;
+    --sheet: #26221e;
+    --on-accent: #191714;
+    --accent-ring: rgb(232 130 107 / 0.2);
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -16px rgb(0 0 0 / 0.6);
+  }
+}
+
+/* Secret mode: everything that was red turns woad blue */
+[data-mode="secret"] { --accent: var(--woad); --accent-ring: rgb(43 74 116 / 0.18); }
+@media (prefers-color-scheme: dark) {
+  [data-mode="secret"] { --accent-ring: rgb(147 179 227 / 0.22); }
+}
+
+/* ---------- Base ---------- */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  transition: --accent var(--dur-mode) var(--ease);
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--vellum);
+  background-image: repeating-linear-gradient(to bottom, transparent 0 31px, var(--rule-faint) 31px 32px);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.1875rem;
+  line-height: 1.55;
+  font-variant-numeric: oldstyle-nums;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.15; }
+p { margin: 0; }
+a { color: inherit; text-decoration-color: var(--accent); text-underline-offset: 0.18em; }
+a:hover { color: var(--accent); }
+code { font-family: var(--mono); font-size: 0.82em; background: var(--vellum); padding: 0.05em 0.35em; border-radius: var(--radius); }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: var(--radius); }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+.skip-link {
+  position: absolute; left: var(--space-4); top: -4rem;
+  background: var(--ink); color: var(--paper);
+  padding: var(--space-2) var(--space-4); border-radius: var(--radius);
+  font-family: var(--sans); font-size: 0.9rem; z-index: 10;
+}
+.skip-link:focus { top: var(--space-4); }
+
+/* ---------- Masthead ---------- */
+.masthead {
+  width: min(72rem, 100% - 2 * var(--space-5));
+  margin: 0 auto;
+  padding: var(--space-5) 0 var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  text-decoration: none;
+  color: var(--ink);
+}
+.brand:hover { color: var(--ink); }
+.brand-mark { width: 1.9rem; height: auto; }
+.brand .brand-mark { color: var(--accent); --weight: 4; }
+.brand-name {
+  font-size: 1.45rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.brand-tag {
+  display: block;
+  font-family: var(--sans);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 500;
+  margin-top: 0.1rem;
+}
+
+.nav { display: flex; gap: var(--space-2); font-family: var(--sans); font-size: 0.82rem; }
+.nav a {
+  position: relative;
+  text-decoration: none;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-soft);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  border-bottom: 2px solid transparent;
+}
+.nav a:hover { color: var(--ink); }
+.nav a.is-current { color: var(--ink); border-radius: 0; }
+.nav a::after {
+  content: "";
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: -2px;
+  height: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.35s var(--ease-ink);
+}
+.nav a:hover::after { transform: scaleX(0.35); }
+.nav a.is-current::after { transform: scaleX(1); }
+
+/* ---------- Page structure ---------- */
+.folio {
+  flex: 1;
+  width: min(72rem, 100% - 2 * var(--space-5));
+  margin: var(--space-6) auto var(--space-7);
+}
+
+.spread {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+@media (min-width: 60rem) {
+  .spread { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: var(--space-6); }
+}
+
+/* A leaf: paper with the double bounding lines of a ruled writing area */
+.leaf {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: clamp(var(--space-5), 5vw, var(--space-7)) clamp(var(--space-4), 5vw, var(--space-7));
+}
+.leaf::before {
+  content: "";
+  position: absolute;
+  inset: var(--space-3);
+  border-left: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  pointer-events: none;
+}
+.leaf > * { position: relative; }
+.leaf--narrow { max-width: 46rem; margin-inline: auto; }
+
+.folio-mark {
+  position: absolute !important;
+  top: var(--space-4);
+  right: var(--space-5);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+
+.rubric {
+  color: var(--accent);
+  font-size: clamp(2rem, 1.4rem + 2.4vw, 2.85rem);
+  letter-spacing: 0.005em;
+  margin-bottom: var(--space-3);
+}
+.rubric--small { font-size: 1.55rem; margin-bottom: var(--space-4); }
+
+/* The scriptorium record: one reserved line, filled by the script */
+.record { margin: 0 0 var(--space-5); min-height: 1.4em; min-height: 1lh; font-family: var(--sans); font-size: 0.85rem; letter-spacing: 0.02em; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.lede + .record { margin-top: calc(-1 * var(--space-4)); }
+
+/* The day's chapter: which chapter, which day, which rung; its source once read */
+.chapter-mark { margin: 0 0 var(--space-2); font-family: var(--sans); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+.chapter-number, .chapter-feast { color: var(--accent); font-weight: 600; }
+.chapter-week { margin: calc(-1 * var(--space-4)) 0 var(--space-5); max-width: var(--measure); color: var(--ink-soft); }
+.chapter-source { margin: calc(-1 * var(--space-4)) 0 var(--space-5); font-style: italic; color: var(--ink-soft); }
+.chapter-nav { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-5); font-family: var(--sans); font-size: 0.9rem; }
+.chapter-nav-after { margin-left: auto; }
+.chapter-invite { margin: 0 0 var(--space-5); color: var(--ink-soft); }
+
+.lede {
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 1.22rem;
+  max-width: var(--measure);
+  margin-bottom: var(--space-6);
+}
+
+.index-heading {
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: var(--space-6) 0 var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.index-heading::after { content: ""; flex: 1; border-top: 1px solid var(--rule); }
+
+/* ---------- Forms ---------- */
+.entry { display: grid; gap: var(--space-5); }
+
+.field { display: grid; gap: var(--space-2); }
+
+.label,
+.field > label,
+.field-head label,
+.choice legend {
+  font-family: var(--sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.label-note { font-weight: 500; letter-spacing: 0.04em; text-transform: none; font-style: normal; }
+
+.input,
+textarea,
+input[type="password"],
+input[type="text"] {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: var(--vellum);
+  border: 1px solid var(--ink-soft);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  min-height: 3rem;
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+textarea { font-size: 1.3rem; line-height: 1.45; resize: vertical; min-height: 7.5rem; }
+textarea.code { font-family: var(--mono); font-size: 0.8rem; min-height: 9rem; }
+textarea::placeholder { color: var(--ink-soft); opacity: 0.7; font-style: italic; }
+textarea:focus,
+input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); outline: none; }
+
+.field-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.counter { white-space: nowrap; }
+.counter.is-near { color: var(--accent); font-weight: 600; }
+
+.passphrase { display: flex; gap: var(--space-2); }
+
+/* A field's hint and its error share one cell: the error takes the hint's
+   place, so showing it moves nothing */
+.field-notes { display: grid; }
+.field-notes > * { grid-area: 1 / 1; }
+.field-notes:has(.field-error:not(:empty)) .field-meta { visibility: hidden; }
+.field-error { font-family: var(--sans); font-size: 0.78rem; font-weight: 600; color: var(--accent); }
+input[aria-invalid="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.passphrase input { font-family: var(--mono); font-size: 1rem; letter-spacing: 0.04em; }
+
+/* Live preview: a fixed strip, so typing never changes the page's height.
+   Its three states (empty, signs, sealed) share one cell of the same size. */
+.preview {
+  margin-top: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  display: grid;
+  gap: var(--space-2);
+}
+.preview .label { margin: 0; }
+.preview-stage { display: grid; height: 3.6rem; }
+.preview-stage > * { grid-area: 1 / 1; min-width: 0; transition: opacity 0.2s var(--ease), visibility 0.2s; }
+.preview-signs {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 var(--space-1);
+  display: flex;
+  gap: var(--space-1);
+  align-items: end;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+}
+.preview-signs li { flex: none; display: grid; justify-items: center; gap: 0.15rem; width: 1.6rem; }
+.preview-signs .glyph { width: 1.25rem; color: var(--ink); }
+.preview-signs .glyph { --weight: 4; }
+.preview-signs span { font-size: 0.85rem; line-height: 1; color: var(--accent); }
+.preview-signs .is-space { width: 1.1rem; }
+.preview-signs .is-space .glyph { color: var(--ink-soft); opacity: 0.55; }
+.preview-note {
+  align-self: center;
+  font-style: italic;
+  font-size: 0.98rem;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+.preview-note--secret,
+.preview.is-empty .preview-signs,
+.preview:not(.is-empty) .preview-note--empty { opacity: 0; visibility: hidden; }
+.entry:has(input[name="mode"][value="secret"]:checked) .preview-signs,
+.entry:has(input[name="mode"][value="secret"]:checked) .preview-note--empty { opacity: 0; visibility: hidden; }
+.entry:has(input[name="mode"][value="secret"]:checked) .preview-note--secret { opacity: 1; visibility: visible; }
+/* A tablet of its own is dealt at inscribing: no preview, as when sealed, and the note says why */
+.preview-note--own { opacity: 0; visibility: hidden; }
+.entry:has(input[name="mode"][value="game"]:checked):has(input[name="tablet"][value="own"]:checked) .preview-signs,
+.entry:has(input[name="mode"][value="game"]:checked):has(input[name="tablet"][value="own"]:checked) .preview-note--empty { opacity: 0; visibility: hidden; }
+.entry:has(input[name="mode"][value="game"]:checked):has(input[name="tablet"][value="own"]:checked) .preview-note--own { opacity: 1; visibility: visible; }
+
+/* Mode and layout: segmented controls (native radios) over one reserved
+   line of description each; the notes swap in place, never resize. One above
+   the other: three layouts need the leaf's width */
+.entry { container-type: inline-size; }
+.choices { display: grid; gap: var(--space-5); }
+.choice { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: var(--space-2); }
+.choice legend { padding: 0; margin-bottom: var(--space-2); }
+.segments {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--rule);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--vellum);
+}
+.segment {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 2.75rem;
+  border-radius: var(--radius);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background-color 0.2s var(--ease), color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.segment input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.segment-title { display: inline-block; font-size: 1.15rem; font-weight: 600; line-height: 1.2; }
+.segment:hover { color: var(--ink); }
+.segment:has(input:checked) { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08), inset 0 -2px 0 var(--accent); }
+.segment:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.segment--game .segment-title::first-letter { color: var(--rubric); }
+.segment--secret .segment-title::first-letter { color: var(--woad); }
+.choice-notes { display: grid; }
+.choice-note { grid-area: 1 / 1; font-size: 1rem; line-height: 1.4; color: var(--ink-soft); }
+@supports selector(:has(*)) {
+  .choice-note { visibility: hidden; }
+  .choice:has(input[value="game"]:checked) [data-note="game"],
+  .choice:has(input[value="secret"]:checked) [data-note="secret"],
+  .choice:has(input[value="phaistos"]:checked) [data-note="phaistos"],
+  .choice:has(input[value="rongorongo"]:checked) [data-note="rongorongo"],
+  .choice:has(input[value="leap"]:checked) [data-note="leap"],
+  .choice:has(input[value="furrows"]:checked) [data-note="furrows"],
+  .choice:has(input[value="unwinding"]:checked) [data-note="unwinding"],
+  .choice:has(input[value="grille"]:checked) [data-note="grille"] { visibility: visible; }
+  .choice:has(input[value="shown"]:checked) [data-note="shown"],
+  .choice:has(input[value="withheld"]:checked) [data-note="withheld"],
+  .choice:has(input[value="shared"]:checked) [data-note="shared"],
+  .choice:has(input[value="own"]:checked) [data-note="own"],
+  .choice:has(input[value="intact"]:checked) [data-note="intact"],
+  .choice:has(input[value="worn"]:checked) [data-note="worn"],
+  .choice:has(input[value="broken"]:checked) [data-note="broken"],
+  .choice:has(input[value="ruined"]:checked) [data-note="ruined"] { visibility: visible; }
+  /* The ladder's rungs the layout or the mode does not allow are greyed, and
+     the reserved note gives the reason: a broken plate follows the snail, a
+     sealed plate never weathers (the rules below weigh more, hence .entry) */
+  .entry:has(input[name="layout"]:not([value="phaistos"]):checked) .segment--snail { opacity: 0.5; }
+  .entry:has(input[name="layout"]:not([value="phaistos"]):checked) .choice--condition:has(.segment--snail input:checked) .choice-note:not(.field-error) { visibility: hidden; }
+  .entry:has(input[name="layout"]:not([value="phaistos"]):checked) .choice--condition:has(.segment--snail input:checked) .choice-note[data-note="snail"] { visibility: visible; }
+  .entry:has(input[name="mode"][value="secret"]:checked) .segment--rung:not(.segment--intact) { opacity: 0.5; }
+  .entry:has(input[name="mode"][value="secret"]:checked) .choice--condition .choice-note:not(.field-error) { visibility: hidden; }
+  .entry:has(input[name="mode"][value="secret"]:checked) .choice--condition .choice-note[data-note="unweathered"] { visibility: visible; }
+  /* The path cannot be withheld on a sealed plate, under a grille, or on a
+     damaged one: Withheld is greyed, and its note gives the reason */
+  .entry:has(input[name="mode"][value="secret"]:checked) .segment--path-withheld,
+  .entry:has(input[name="layout"][value="grille"]:checked) .segment--path-withheld,
+  .entry:has(input[name="condition"]:is([value="broken"], [value="ruined"]):checked) .segment--path-withheld { opacity: 0.5; }
+  .entry:has(input[name="mode"][value="secret"]:checked) .choice--path:has(.segment--path-withheld input:checked) .choice-note:not(.field-error),
+  .entry:has(input[name="layout"][value="grille"]:checked) .choice--path:has(.segment--path-withheld input:checked) .choice-note:not(.field-error),
+  .entry:has(input[name="condition"]:is([value="broken"], [value="ruined"]):checked) .choice--path:has(.segment--path-withheld input:checked) .choice-note:not(.field-error) { visibility: hidden; }
+  .entry:has(input[name="condition"]:is([value="broken"], [value="ruined"]):checked) .choice--path:has(.segment--path-withheld input:checked) .choice-note[data-note="path-broken"],
+  .entry:has(input[name="layout"][value="grille"]:checked) .choice--path:has(.segment--path-withheld input:checked) .choice-note[data-note="path-grille"],
+  .entry:has(input[name="mode"][value="secret"]:checked) .choice--path:has(.segment--path-withheld input:checked) .choice-note[data-note="path-sealed"] { visibility: visible; }
+  /* A choice sent back with an error: the error takes its note's place
+     (important: the tablet's and the path's reasons weigh more than any class count) */
+  .entry .choice-notes:has(.field-error:not(:empty)) .choice-note:not(.field-error) { visibility: hidden !important; }
+  .entry .choice-notes .choice-note.field-error:not(:empty) { visibility: visible; }
+  /* One reason at a time, the first that holds: sealed, then grille, then broken
+     (as heavy as the reasons above, and later) */
+  .entry:has(input[name="mode"][value="secret"]:checked) .choice--path:has(.segment--path-withheld input:checked) .choice-note:is([data-note="path-grille"], [data-note="path-broken"]),
+  .entry:has(input[name="layout"][value="grille"]:checked) .choice--path:has(.segment--path-withheld input:checked) .choice-note[data-note="path-broken"] { visibility: hidden; }
+}
+
+/* Layout: six ways, each a small figure of its reading order over its name,
+   two rows of three at every width (the leaf is never wide enough for six) */
+.segments--ways { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.segment--way { align-content: center; gap: 2px; padding: var(--space-2) 0 var(--space-1); }
+.segment--way .segment-title { font-size: 0.95rem; }
+.segment-figure { display: block; line-height: 0; }
+.segment-figure .snail, .segment-figure .grille-order { width: 2.4rem; }
+.segment-figure .snail polyline { stroke: currentColor; animation: none; stroke-dashoffset: 0; }
+.segment-figure .snail circle { fill: currentColor; }
+.segment-figure .snail circle.turned { fill: var(--vellum); stroke: currentColor; }
+.segment-figure .snail .snail-start { fill: var(--accent); }
+.segment-figure .grille-order text { display: none; }
+
+/* Condition: the ladder, four rungs in the leaf's width */
+.segments--ladder .segment-title { font-size: 1.05rem; }
+@container (min-width: 30rem) { .segments--ladder .segment-title { font-size: 1.15rem; } }
+
+.field-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
+.field-head .counter { font-family: var(--sans); font-size: 0.78rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+/* The grille key unfolds with the grille, the passphrase in secret mode (CSS
+   only: no reflow when JS arrives). They sit below the message, so only the
+   button moves. The slots and the button share a gapless wrapper; the space
+   above the button lives inside the parts that fold away. */
+.entry-end { display: grid; }
+.slot { display: grid; grid-template-rows: 1fr; }
+.slot-inner { min-height: 0; overflow: hidden; padding: 4px; margin: -4px; } /* room for focus rings */
+.slot .field { margin-bottom: var(--space-5); }
+.key-input { font-family: var(--mono); letter-spacing: 0.12em; text-transform: uppercase; max-width: 16rem; }
+.key-input::placeholder { text-transform: none; letter-spacing: 0.12em; }
+@supports selector(:has(*)) {
+  .slot {
+    transition: grid-template-rows var(--dur-mode) var(--ease-ink), opacity var(--dur-mode) var(--ease), visibility 0s linear 0s;
+  }
+  .entry:has(input[name="mode"][value="game"]:checked) .secret-slot,
+  .entry:not(:has(input[name="layout"][value="grille"]:checked)) .grille-slot {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    visibility: hidden;
+    transition-delay: 0s, 0s, var(--dur-mode);
+  }
+}
+
+/* Shown only once the script runs, in space kept for them from the start */
+.awaits-script { visibility: hidden; }
+
+/* Mode cards (About): two index cards, red and blue */
+.mode-options { display: grid; gap: var(--space-3); }
+@media (min-width: 34rem) { .mode-options { grid-template-columns: 1fr 1fr; } }
+
+.mode {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease), background-color 0.15s var(--ease), transform 0.15s var(--ease);
+}
+.mode:hover { border-color: var(--ink-soft); }
+.mode input {
+  appearance: none;
+  margin: 0.3rem 0 0;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 1.5px solid var(--ink-soft);
+  border-radius: 50%;
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+}
+.mode input::before {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  transform: scale(0);
+  transition: transform 0.15s var(--ease);
+  background: var(--mode-accent);
+}
+.mode input:checked { border-color: var(--mode-accent); }
+.mode input:checked::before { transform: scale(1); }
+.mode--game { --mode-accent: var(--rubric); }
+.mode--secret { --mode-accent: var(--woad); }
+.mode:has(input:checked) { border-color: var(--mode-accent); box-shadow: inset 3px 0 0 var(--mode-accent); }
+.mode-title { font-size: 1.3rem; font-weight: 600; line-height: 1.3; }
+.mode-title::first-letter { color: var(--mode-accent); }
+.mode-desc { grid-column: 2; font-size: 1rem; line-height: 1.4; color: var(--ink-soft); }
+
+
+[hidden] { display: none !important; }
+
+/* ---------- Buttons ---------- */
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+.actions + .plate { margin-top: var(--space-5); } /* Download leads: the plate follows the actions */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--ink-soft);
+  border-radius: var(--radius);
+  padding: 0.8rem 1.25rem;
+  min-height: 3rem;
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.1s var(--ease);
+}
+.btn:hover { border-color: var(--ink); color: var(--ink); background: var(--vellum); }
+.btn:active { transform: translateY(1px); }
+.btn--primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn--primary:hover { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.btn--quiet { border-color: transparent; padding-inline: var(--space-3); color: var(--ink-soft); }
+.btn--quiet:hover { background: transparent; border-color: transparent; text-decoration: underline; }
+.btn--small { padding: 0 var(--space-4); }
+.entry > .btn--primary,
+.entry-end > .btn--primary { justify-self: start; min-width: 12rem; font-size: 0.9rem; }
+/* The reader's puzzle: one disclosure below the message, its summary two
+   fixed lines (what it is, and what it holds), so a choice inside never moves
+   the button; the space above the button lives inside it, as in the slots */
+.puzzle { margin-bottom: var(--space-5); border: 1px solid var(--rule); border-radius: var(--radius); background: var(--vellum); }
+.puzzle-summary { display: grid; grid-template-columns: auto 1fr; gap: 0 var(--space-2); padding: var(--space-3) var(--space-4); cursor: pointer; list-style: none; }
+.puzzle-summary::-webkit-details-marker { display: none; }
+.puzzle-summary::before { content: '▸'; grid-row: 1 / 3; color: var(--accent); transition: transform var(--dur-mode) var(--ease); }
+.puzzle[open] > .puzzle-summary::before { transform: rotate(90deg); }
+.puzzle-title { font-family: var(--sans); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); }
+.puzzle-state, .puzzle-sealed { grid-column: 2; font-style: italic; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.puzzle-sealed { display: none; color: var(--ink-soft); }
+.puzzle-summary:hover .puzzle-title { color: var(--ink); }
+.puzzle-choices { padding: var(--space-2) var(--space-4) var(--space-4); }
+@supports selector(:has(*)) {
+  .entry:has(input[name="mode"][value="secret"]:checked) .puzzle-state { display: none; }
+  .entry:has(input[name="mode"][value="secret"]:checked) .puzzle-sealed { display: block; }
+}
+
+/* ---------- The key (how to read a sign) ---------- */
+.glyph path { fill: currentColor; stroke: currentColor; stroke-width: var(--weight, 0); stroke-linejoin: round; }
+
+.anatomy {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: var(--space-4);
+  row-gap: var(--space-6);
+}
+.anatomy .glyph { grid-column: 2; grid-row: 1 / span 2; width: 5.5rem; color: var(--ink); }
+.quadrant {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: var(--space-1) var(--space-2);
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2));
+  border-radius: var(--radius);
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  line-height: 1.3;
+}
+.quadrant b { display: block; font-family: var(--serif); font-size: 1.7rem; letter-spacing: 0; color: var(--accent); font-weight: 600; }
+.quadrant--tens, .quadrant--thousands { text-align: right; grid-column: 1; }
+.quadrant--units, .quadrant--hundreds { grid-column: 3; }
+.quadrant--tens, .quadrant--units { grid-row: 1; align-self: start; }
+.quadrant--thousands, .quadrant--hundreds { grid-row: 2; align-self: end; }
+.quadrant:not(:disabled) { cursor: pointer; transition: background-color 0.2s var(--ease); }
+.quadrant:not(:disabled):hover { background: var(--vellum); }
+.quadrant:disabled { color: var(--ink-soft); opacity: 1; }
+.quadrant b { transition: transform 0.25s var(--ease-ink); }
+.quadrant:not(:disabled):active b { transform: translateY(1px); }
+.anatomy figcaption { min-height: 3.1em; min-height: 2lh; } /* the longest date names wrap to two lines: keep them */
+.anatomy-hint { grid-column: 1 / -1; text-align: center; font-family: var(--sans); font-size: 0.78rem; color: var(--ink-soft); margin-top: calc(-1 * var(--space-4)); }
+.anatomy figcaption,
+.order figcaption,
+.plate figcaption {
+  grid-column: 1 / -1;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 1rem;
+  text-align: center;
+}
+
+.tabula {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+.tabula li {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) 0 var(--space-1);
+  border-radius: var(--radius);
+  transition: background-color 0.15s var(--ease);
+}
+.tabula li:hover { background: var(--vellum); }
+.tabula .glyph { width: 100%; max-width: 2.2rem; color: var(--ink); }
+.tabula .glyph { --weight: 3; }
+.tabula span { font-size: 1.05rem; color: var(--accent); line-height: 1; }
+
+.note { font-size: 1rem; color: var(--ink-soft); margin-top: var(--space-3); }
+
+.order { margin: 0; display: grid; grid-template-columns: 5.5rem 1fr; gap: var(--space-4); align-items: center; }
+.order figcaption { text-align: left; }
+.snail { width: 5.5rem; }
+.snail polyline { fill: none; stroke: var(--accent); stroke-width: 1.4; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 0; }
+.snail circle { fill: var(--ink-soft); }
+.snail .snail-start { fill: var(--accent); }
+.snail circle.turned { fill: var(--paper); stroke: var(--ink-soft); stroke-width: 1; }
+.orders { display: grid; }
+.orders > .order { grid-area: 1 / 1; align-self: start; }
+@supports selector(:has(*)) {
+  body:has(input[name="layout"]:not([value="phaistos"]):checked) [data-layout-note="phaistos"],
+  body:not(:has(input[name="layout"][value="rongorongo"]:checked)) [data-layout-note="rongorongo"],
+  body:not(:has(input[name="layout"][value="leap"]:checked)) [data-layout-note="leap"],
+  body:not(:has(input[name="layout"][value="furrows"]:checked)) [data-layout-note="furrows"],
+  body:not(:has(input[name="layout"][value="unwinding"]:checked)) [data-layout-note="unwinding"],
+  body:not(:has(input[name="layout"][value="grille"]:checked)) [data-layout-note="grille"] { visibility: hidden; }
+  body:not(:has(input[name="path"][value="withheld"]:checked)) [data-path-withheld] { visibility: hidden; }
+  /* Its own tablet: greyed, with its reason in the note, on a sealed plate, under a grille and on a damaged
+     one; on a message under six words the note says the plate is close to guessing (the counter sets is-short) */
+  .entry:has(input[name="mode"][value="secret"]:checked) .segment--tablet-own,
+  .entry:has(input[name="layout"][value="grille"]:checked) .segment--tablet-own,
+  .entry:has(input[name="condition"]:not([value="intact"]):checked) .segment--tablet-own { opacity: 0.5; }
+  .entry:has(input[name="mode"][value="secret"]:checked) .choice--tablet:has(.segment--tablet-own input:checked) .choice-note:not(.field-error),
+  .entry:has(input[name="layout"][value="grille"]:checked) .choice--tablet:has(.segment--tablet-own input:checked) .choice-note:not(.field-error),
+  .entry:has(input[name="condition"]:not([value="intact"]):checked) .choice--tablet:has(.segment--tablet-own input:checked) .choice-note:not(.field-error),
+  .entry.is-short .choice--tablet:has(.segment--tablet-own input:checked) .choice-note:not(.field-error),
+  .entry:has(input[name="path"][value="withheld"]:checked) .choice--tablet:has(.segment--tablet-own input:checked) .choice-note[data-note="own"] { visibility: hidden; }
+  .entry.is-short .choice--tablet:has(.segment--tablet-own input:checked) .choice-note[data-note="tablet-short"],
+  .entry:has(input[name="condition"]:not([value="intact"]):checked) .choice--tablet:has(.segment--tablet-own input:checked) .choice-note[data-note="tablet-damaged"],
+  .entry:has(input[name="layout"][value="grille"]:checked) .choice--tablet:has(.segment--tablet-own input:checked) .choice-note[data-note="tablet-grille"],
+  .entry:has(input[name="mode"][value="secret"]:checked) .choice--tablet:has(.segment--tablet-own input:checked) .choice-note[data-note="tablet-sealed"] { visibility: visible; }
+  /* One reason at a time, the first that holds: sealed, then grille, then damaged */
+  .entry:has(input[name="mode"][value="secret"]:checked) .choice--tablet:has(.segment--tablet-own input:checked) .choice-note:is([data-note="tablet-grille"], [data-note="tablet-damaged"]),
+  .entry:has(input[name="layout"][value="grille"]:checked) .choice--tablet:has(.segment--tablet-own input:checked) .choice-note[data-note="tablet-damaged"] { visibility: hidden; }
+  /* Pathless and its own: the expert plate, said when nothing above is */
+  .entry:has(input[name="path"][value="withheld"]:checked):not(.is-short):not(:has(input[name="mode"][value="secret"]:checked)):not(:has(input[name="layout"][value="grille"]:checked)):not(:has(input[name="condition"]:not([value="intact"]):checked)) .choice--tablet:has(.segment--tablet-own input:checked) .choice-note[data-note="tablet-expert"] { visibility: visible; }
+}
+/* The grille over a 4 x 4 grid: its holes (paper) at N, each other cell
+   lettered with the turn that brings a hole over it */
+.grille-order { width: 5.5rem; }
+.grille-order rect { fill: var(--vellum); stroke: var(--rule); stroke-width: 1; }
+.grille-order text { font-family: var(--sans); font-size: 8px; text-anchor: middle; fill: var(--ink-soft); }
+.grille-order .grille-hole rect { fill: var(--paper); stroke: var(--accent); stroke-width: 1.4; }
+.grille-order .grille-hole text { fill: var(--accent); font-weight: 600; }
+@supports not selector(:has(*)) { .orders > .order + .order { grid-area: auto; margin-top: var(--space-4); } }
+
+/* ---------- The plate (result) ---------- */
+.specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: 0 0 var(--space-5);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.specs div { display: grid; gap: 0.1rem; }
+.specs dt {
+  font-family: var(--sans);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.specs dd { margin: 0; font-size: 1.25rem; font-variant-numeric: lining-nums; }
+
+.message-echo {
+  font-size: clamp(1.3rem, 1.1rem + 0.8vw, 1.6rem);
+  line-height: 1.35;
+  max-width: 44ch;
+  margin-bottom: var(--space-2);
+  overflow-wrap: anywhere;
+}
+.message-echo q { quotes: "“" "”"; }
+.message-echo q::before, .message-echo q::after { color: var(--accent); }
+
+.plate {
+  margin: 0 0 var(--space-5);
+  display: grid;
+  gap: var(--space-3);
+}
+.plate-frame {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: clamp(var(--space-2), 3vw, var(--space-5));
+  box-shadow: inset 0 0 0 4px var(--paper), inset 0 0 0 5px var(--rule);
+  display: grid;
+  place-items: center;
+}
+.plate-frame svg { display: block; width: auto; height: auto; max-width: 100%; max-height: min(78vh, 60rem); color: var(--ink); }
+/* The plate is a tablet of clay: the file's white ground takes the clay's colour and
+   its rim on the page (the file stays black on white, for the decoder). The signs
+   are pressed, then inked; a large plate's strokes get optical weight (--plate-weight,
+   by grid size, in the plate's own units) so they stay strokes, not hairlines */
+.plate-frame svg > rect:first-child { fill: var(--clay); stroke: var(--clay-edge); stroke-width: 3; }
+.plate-frame svg path { fill: currentColor; stroke: currentColor; stroke-width: var(--plate-weight, 0); stroke-linejoin: round; } /* the pressed signs */
+.plate--medium { --plate-weight: 1.5; }
+.plate--large { --plate-weight: 3; }
+/* A weathered plate's lacunae: a chip in the clay, its pale body showing, hatched as an
+   epigrapher hatches a break */
+.plate-frame svg .weathering { stroke: var(--clay-edge); }
+.plate-frame svg pattern rect:first-child { fill: var(--paper); }
+.plate-frame svg pattern rect + rect { fill: var(--clay-edge); }
+.plate-frame:focus-visible { outline-offset: 4px; }
+.plate-frame.is-turned svg { transform: rotate(180deg); }
+.plate-frame svg path { transition: color 0.3s var(--ease); }
+.plate-frame svg path.is-lit { color: var(--accent); }
+
+/* The grille: the stencil laid exactly over the plate (same viewBox; ink.js
+   gives it the plate's box), turned a quarter at a time. It never takes the
+   pointer, so the plate can still be walked through it */
+.plate-frame { position: relative; }
+/* Zoom on a plate of many signs (app.js, initPlateZoom): the frame keeps its
+   size and becomes a window the plate grows behind, scrolled or dragged; the
+   control is docked on its mount, bottom right, in a margin deepened for it */
+.plate-view { position: relative; min-width: 0; }
+.plate-frame--zoomable { padding-bottom: calc(clamp(var(--space-2), 3vw, var(--space-5)) + 2.6rem); } /* the mount holds the control: at ×1 it covers no sign */
+.plate-frame.is-zoomed { overflow: auto; place-items: start; overscroll-behavior: contain; cursor: grab; }
+.plate-frame.is-zoomed.is-panning { cursor: grabbing; user-select: none; }
+.plate-frame.is-zoomed svg { margin: auto; max-width: none; max-height: none; }
+.plate-zoom { position: absolute; right: 10px; bottom: 10px; z-index: 2; display: flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--paper); box-shadow: 0 1px 3px rgb(0 0 0 / 0.1); }
+.plate-zoom-button { min-width: 2.25rem; height: 2.25rem; padding: 0 var(--space-2); border: 0; border-radius: var(--radius); background: transparent; color: var(--ink); font: 600 1.1rem/1 var(--sans); cursor: pointer; }
+.plate-zoom-button:hover:not(:disabled) { background: var(--vellum); }
+.plate-zoom-button:disabled { color: var(--ink-soft); opacity: 0.45; cursor: default; }
+.plate-zoom-level { min-width: 3rem; font: 500 0.8rem/1 var(--sans); font-variant-numeric: tabular-nums; }
+.plate-zoom-level:disabled { opacity: 1; color: var(--ink-soft); } /* at ×1 the level is said, not pressed */
+.plate-frame .grille-sheet {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  transform: rotate(calc(var(--turn, 0) * 90deg));
+  transition: transform var(--dur-turn) var(--ease-ink), opacity 0.3s var(--ease);
+  filter: drop-shadow(0 4px 10px rgb(43 36 28 / 0.25));
+}
+.plate-frame .grille-sheet.is-laid { opacity: 1; }
+.plate-frame .grille-sheet .stencil-sheet { fill: var(--sheet); stroke: var(--rule); stroke-width: 3; }
+/* On screen the sheet's N and its key grow with the plate (the printed stencil keeps the file's sizes) */
+.plate--medium .grille-sheet .stencil-north { font-size: 44px; }
+.plate--large .grille-sheet .stencil-north { font-size: 60px; }
+.plate--medium .grille-sheet .stencil-key { font-size: 28px; }
+.plate--large .grille-sheet .stencil-key { font-size: 40px; }
+.plate-frame .grille-sheet .stencil-north { fill: var(--accent); font-family: var(--serif); font-weight: 600; }
+.plate-frame .grille-sheet .stencil-key { fill: var(--ink-soft); font-family: var(--serif); }
+.grille-key { font-family: var(--mono); font-size: 0.95em; letter-spacing: 0.08em; }
+/* A plate's own tablet, on its plate page (.tablet is About's): twenty-seven rows in columns, the value then the character */
+.own-tablet { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--rule); }
+.own-tablet .index-heading { margin-bottom: var(--space-2); }
+.own-tablet-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); gap: var(--space-1) var(--space-3); margin: var(--space-3) 0 0; padding: 0; list-style: none; font-family: var(--mono); font-size: 0.95rem; }
+.own-tablet-value { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.own-tablet-char { font-weight: 600; }
+.grille-actions { margin-bottom: var(--space-4); }
+/* Two readers: the novice's message under the abbot's, and a choice of grille */
+.decoy-echo { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); color: var(--ink-soft); margin-bottom: var(--space-3); overflow-wrap: anywhere; }
+.decoy-echo q { quotes: "“" "”"; font-size: 1.15rem; }
+.grille-choice { display: inline-grid; min-width: 12rem; }
+.grille-choice .segment { border: 0; background: transparent; font: inherit; padding: 0 var(--space-4); }
+.grille-choice .segment[aria-pressed="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08), inset 0 -2px 0 var(--accent); }
+@media (prefers-reduced-motion: no-preference) {
+  .plate-frame svg { transition: transform var(--dur-turn) var(--ease-ink); }
+}
+
+/* Walking the snail: a soft field glides from sign to sign */
+.plate-focus {
+  fill: var(--accent);
+  fill-opacity: 0.08;
+  stroke: var(--accent);
+  stroke-opacity: 0.35;
+  stroke-width: 1.5;
+  opacity: 0;
+  transition: opacity 0.25s var(--ease), transform 0.3s var(--ease-ink);
+  pointer-events: none;
+}
+.plate-focus.is-visible { opacity: 1; }
+.plate-reading { display: grid; }
+.plate-reading > * { grid-area: 1 / 1; }
+.plate-reading.is-walking .plate-reading-rest { visibility: hidden; }
+.plate-hint { display: block; font-family: var(--sans); font-style: normal; font-size: 0.78rem; margin-top: var(--space-1); }
+[data-plate-reading] { font-variant-numeric: lining-nums; }
+/* An order of reading is drawn along its path */
+@keyframes ink { to { stroke-dashoffset: 0; } }
+
+/* ---------- Ink: the one motion vocabulary (see public/js/ink.js) ---------- */
+/* A wedge is pressed: the stylus bites at its head and runs to its tip, wet in
+   the mode's colour (is-wet), then the ink dries. ink.js reads where it bites
+   (--ox, --oy, in the sign's units) and which way it runs (--a) from the wedge
+   itself; the wedge grows along its stroke from there. The two phases are two
+   animations, one after the other (ink.js hands over): animating shape and
+   colour at once on thousands of SVG paths costs more than a frame. Colour
+   dries, not fill, so a small sign's optical weight (its stroke) dries with it.
+   Lighting a corner dries the ink at once (is-wet goes); the stroke still runs. */
+path.ink-press {
+  transform-box: view-box;
+  transform-origin: calc(var(--ox, 0) * 1px) calc(var(--oy, 0) * 1px);
+  animation: ink-press var(--dur-stroke) var(--ease-ink) var(--delay) both;
+}
+path.ink-press.is-wet { color: var(--accent); }
+@keyframes ink-press {
+  from { opacity: 0; transform: rotate(var(--a, 0deg)) scaleX(var(--from, 1)) rotate(calc(-1 * var(--a, 0deg))); }
+  5% { opacity: 1; }
+  to { opacity: 1; transform: rotate(var(--a, 0deg)) scaleX(1) rotate(calc(-1 * var(--a, 0deg))); }
+}
+path.ink-dry { animation: ink-dry var(--dur-dry) ease-out var(--dry-delay, 0ms) both; }
+@keyframes ink-dry { from { color: var(--accent); } }
+path.ink-lift { animation: ink-lift var(--dur-lift) var(--ease) forwards; }
+@keyframes ink-lift { to { opacity: 0; } }
+/* A highlighted corner: the strokes of one place, in the mode's colour */
+.glyph path { transition: color 0.3s var(--ease); }
+.glyph path.ink-press { transition: none; } /* wet from the first touch */
+.glyph path.is-lit { color: var(--accent); }
+
+/* ---------- Transcription reveal ---------- */
+.reveal { animation: reveal 0.6s var(--ease) var(--d) both; }
+@keyframes reveal { from { opacity: 0; filter: blur(3px); } }
+
+.readback {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: var(--space-3);
+}
+.readback .passphrase { max-width: 30rem; }
+.readback-row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: end; }
+
+/* ---------- Decode ---------- */
+.dropzone {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-7) var(--space-5);
+  border: 1.5px dashed var(--ink-soft);
+  border-radius: var(--radius);
+  background: var(--vellum);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease), background-color 0.15s var(--ease);
+}
+.dropzone:hover,
+.dropzone.is-over { border-color: var(--accent); background: var(--paper); }
+.dropzone:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
+.dropzone .glyph { width: 2.6rem; color: var(--ink-soft); }
+.dropzone-title { font-size: 1.35rem; font-weight: 600; }
+.dropzone-sub { font-family: var(--sans); font-size: 0.82rem; color: var(--ink-soft); }
+.dropzone-file {
+  /* One reserved line: a long name is cut, never wrapped, so nothing moves */
+  display: block;
+  max-width: 100%;
+  height: 1.5em;
+  line-height: 1.5;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+.dropzone input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+.paste summary {
+  cursor: pointer;
+  font-style: italic;
+  color: var(--ink-soft);
+  width: fit-content;
+}
+.paste summary:hover { color: var(--ink); }
+.paste[open] summary { margin-bottom: var(--space-3); }
+
+/* ---------- Transcription (decoded) ---------- */
+.transcription {
+  margin: 0 0 var(--space-6);
+  font-size: clamp(1.45rem, 1.2rem + 1vw, 1.9rem);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 40ch;
+  display: flow-root; /* contains the floated initial */
+}
+/* A plain Cistercian initial: one colour, no ornament, two lines tall */
+.transcription::first-letter {
+  float: left;
+  font-size: 2.9em;
+  line-height: 0.85;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 0.04em 0.08em 0 0;
+}
+@supports (initial-letter: 2) {
+  .transcription::first-letter { float: none; font-size: inherit; line-height: inherit; padding: 0 0.1em 0 0; initial-letter: 2; }
+}
+/* The reading desk, under an intact plate: the pair shown large, two numbers
+   to type, the letter, the text so far. Every part keeps its size whatever is
+   read, so nothing moves */
+.desk { display: grid; gap: var(--space-4); margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--rule); container: desk / inline-size; }
+/* The reading room: on a wide screen the plate and the work side by side, the
+   plate held in view (sticky) while the desk, the bench or the notebook scrolls */
+@media (min-width: 70rem) {
+  .room { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-6); align-items: start; }
+  .room-work > :first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+}
+@media (min-width: 70rem) and (min-height: 36rem) {
+  .room-plate { position: sticky; top: var(--space-4); }
+  .room-plate .plate-frame svg { max-height: calc(100vh - 14rem); } /* the plate, its frame and its caption within the screen */
+}
+.desk-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.desk-head .index-heading { margin: 0; }
+.desk-modes { display: inline-grid; min-width: 12rem; }
+.desk-modes .segment { border: 0; background: transparent; font: inherit; padding: 0 var(--space-4); }
+.desk-modes .segment[aria-pressed="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08), inset 0 -2px 0 var(--accent); }
+.desk-nav { display: flex; align-items: center; gap: var(--space-3); }
+.desk-which { font-family: var(--sans); font-size: 0.85rem; color: var(--ink-soft); min-width: 13rem; font-variant-numeric: tabular-nums; }
+.desk-pair { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+/* A narrow desk (a phone, or the reading room's column) sets the pair as a
+   sum on paper, one sign and its value above the other, the letter beneath */
+@container desk (max-width: 34rem) {
+  .desk-pair { display: grid; grid-template-columns: 1.2rem 3.4rem minmax(0, 1fr); grid-template-areas: ". s1 v1" "plus s2 v2" "eq letter read"; gap: var(--space-2) var(--space-3); }
+  .desk-pair > [data-desk-sign="0"] { grid-area: s1; }
+  .desk-pair > [data-desk-sign="1"] { grid-area: s2; }
+  .desk-pair > [data-desk-value="0"] { grid-area: v1; }
+  .desk-pair > [data-desk-value="1"] { grid-area: v2; }
+  .desk-pair > .desk-op:nth-of-type(1) { grid-area: plus; }
+  .desk-pair > .desk-op:nth-of-type(2) { grid-area: eq; }
+  .desk-pair > .desk-letter { grid-area: letter; justify-self: center; }
+  .desk-pair > [data-desk-read] { grid-area: read; justify-self: start; }
+  .desk-pair > .desk-value { width: 100%; max-width: 10rem; }
+  .desk-pair > .desk-op { justify-self: center; }
+}
+.desk-sign { display: grid; place-items: center; width: 3.4rem; height: 4.8rem; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--vellum); cursor: pointer; }
+.desk-sign .desk-glyph { width: 2.6rem; color: var(--ink); }
+.desk-sign .desk-glyph path { fill: currentColor; }
+.desk-value { width: 6.5rem; font-variant-numeric: tabular-nums; }
+.desk-value[aria-invalid="true"] { border-color: var(--rubric); box-shadow: inset 0 0 0 1px var(--rubric); }
+.desk-op { font-family: var(--mono); font-size: 1.2rem; color: var(--ink-soft); }
+.desk-letter { display: grid; place-items: center; min-width: 2.6rem; height: 2.6rem; padding: 0 var(--space-2); border-radius: var(--radius); background: var(--paper); border: 1px solid var(--rule); font-family: var(--mono); font-size: 1.25rem; color: var(--accent); }
+.desk-feedback { margin: 0; font-family: var(--sans); font-size: 0.9rem; color: var(--ink-soft); min-height: 2.8em; min-height: 2lh; }
+@container desk (max-width: 34rem) { .desk-feedback { min-height: 4.2em; min-height: 3lh; } } /* the longest answer, on a phone or in the reading room's column */
+.desk-text { margin: 0; font-family: var(--mono); font-size: 0.95rem; overflow-wrap: anywhere; color: var(--ink); min-height: 1.4em; min-height: 1lh; }
+.desk-standing { visibility: hidden; } /* the ranks are earned unaided */
+/* A pathless plate: the question, the five ways to lay (figures as labels, as
+   on the form), the notebook of what each gave; every part keeps its size */
+.ways-ask { display: grid; gap: var(--space-2); } /* a pathless plate's question, at the desk or the bench */
+.ways-question { margin: 0; font-family: var(--sans); font-size: 0.9rem; color: var(--ink-soft); }
+.ways { grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr)); }
+.ways .segment { border: 0; background: transparent; font: inherit; }
+.ways .segment[aria-pressed="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08), inset 0 -2px 0 var(--accent); }
+.desk-sign:empty::after { content: '?'; font-family: var(--mono); color: var(--ink-soft); } /* waiting for a way */
+/* The notebook of a plate with a tablet of its own: pencil is grey and slanted, ink is upright and dark */
+.desk-text--notebook { white-space: pre-wrap; }
+.desk-text--notebook .is-pencil { color: var(--ink-soft); font-style: italic; }
+.desk-text--notebook .is-ink { color: var(--ink); font-weight: 600; }
+.notebook { display: grid; gap: var(--space-3); margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--rule); container: notebook / inline-size; }
+.notebook-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2) var(--space-3); }
+.notebook-head .index-heading { margin: 0; }
+.notebook-count, .notebook-note, .notebook-verdict { margin: 0; font-family: var(--sans); font-size: 0.85rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.notebook-scroll { overflow-x: auto; }
+.notebook-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.notebook-table th { text-align: left; font-family: var(--sans); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--rule); }
+.notebook-table td { padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--rule); vertical-align: middle; }
+.notebook-sum { font-family: var(--mono); font-weight: 600; }
+.notebook-seen { font-variant-numeric: tabular-nums; text-align: right; }
+.notebook-spellings { font-family: var(--mono); font-size: 0.78rem; color: var(--ink-soft); }
+.notebook-spellings .spelling + .spelling::before, .notebook-spellings .spelling-more::before { content: ' · '; }
+.notebook-spellings .spelling-more { display: none; }
+.notebook-spellings .spelling-more--wide { display: inline; }
+.notebook-entry { width: 6.5rem; padding-block: 0.2rem; font-family: var(--mono); }
+.notebook-entry.is-pencil { font-style: italic; color: var(--ink-soft); }
+.notebook-entry.is-ink { font-weight: 600; color: var(--ink); border-color: var(--ink); opacity: 1; }
+.notebook-table tr.is-unseen > * { visibility: hidden; } /* unaided: a sum enters the notebook once its pair is read */
+.notebook.is-shut .notebook-scroll { display: none; } /* the expert plate: shut until the way is found */
+.notebook-ask { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+/* The text held at the top of the screen and the scribe at the bottom while
+   the entries scroll: a letter pencilled anywhere is read, and asked, at once */
+.notebook-line { position: sticky; top: 0; z-index: 1; background: var(--paper); padding-block: var(--space-2); border-bottom: 1px solid var(--rule); }
+.notebook-ask { position: sticky; bottom: 0; z-index: 1; background: var(--paper); padding-block: var(--space-3); border-top: 1px solid var(--rule); }
+.notebook-verdict { flex: 1 1 18rem; min-height: 1.4em; min-height: 1lh; }
+@container notebook (max-width: 34rem) { /* a phone, or the reading room's column: one spelling per sum, one line per row */
+  .notebook-spellings { white-space: nowrap; font-size: 0.72rem; }
+  .notebook-spellings .spelling:nth-of-type(n+2) { display: none; }
+  .notebook-spellings .spelling-more { display: inline; }
+  .notebook-entry { width: 4.5rem; }
+  .notebook-verdict { min-height: 2.8em; min-height: 2lh; } /* the longest answer, on a phone */
+}
+.desk-notebook, .bench-notebook { margin: 0; font-family: var(--sans); font-size: 0.85rem; color: var(--ink-soft); overflow-wrap: anywhere; min-height: 2.8em; min-height: 2lh; }
+.bench-notebook { min-height: 4.2em; min-height: 3lh; } /* five short lines fit three on a phone */
+.desk[data-desk-mode="unaided"] .desk-standing { visibility: visible; }
+[data-desk-rank] { color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; }
+
+/* The restoration bench, under a weathered plate: a lacuna to choose, ten
+   digits to press, the pair weighed in two short lines, the edition so far.
+   Every part keeps its size whatever is chosen, so nothing moves */
+.bench { display: grid; gap: var(--space-4); margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--rule); }
+.bench-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.bench-head .index-heading { margin: 0; }
+.bench-nav { display: flex; align-items: center; gap: var(--space-3); }
+.bench-which { font-family: var(--sans); font-size: 0.85rem; color: var(--ink-soft); min-width: 13rem; text-align: center; font-variant-numeric: tabular-nums; }
+.bench-palette { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: var(--space-2); max-width: 36rem; }
+@media (max-width: 30rem) { .bench-palette { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.bench-digit {
+  display: grid; justify-items: center; gap: 2px; padding: var(--space-2) 0 var(--space-1);
+  border: 1px solid var(--rule); border-radius: var(--radius); background: var(--vellum); color: var(--ink);
+  font-family: var(--mono); font-size: 0.75rem; cursor: pointer;
+}
+.bench-digit .bench-glyph { width: 1.6rem; height: 2.4rem; }
+.bench-digit .bench-glyph path { fill: currentColor; }
+.bench-digit[aria-pressed="true"] { border-color: var(--rubric); color: var(--rubric); box-shadow: inset 0 0 0 1px var(--rubric); }
+.bench-digit:disabled { opacity: 0.3; cursor: not-allowed; }
+.bench-digit:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bench-balance { display: grid; gap: 2px; margin: 0; }
+.bench-sum { font-family: var(--mono); font-size: 0.95rem; white-space: nowrap; }
+.bench-verdict { font-family: var(--sans); font-size: 0.9rem; color: var(--ink-soft); white-space: nowrap; }
+.bench-edition { margin: 0; font-family: var(--mono); font-size: 0.95rem; overflow-wrap: anywhere; color: var(--ink); }
+.plate-frame svg .bench-target { fill: transparent; stroke: transparent; stroke-width: 3; cursor: pointer; }
+.plate-frame svg .bench-target:hover { stroke: var(--clay-edge); }
+.plate-frame svg .bench-target.is-current { stroke: var(--rubric); }
+.plate-frame svg path.restored { color: var(--rubric); }
+/* A broken plate: the board, the fragments in their tray, and the rejoining. The file's
+   ground is the tray, not a plate: the fragments carry the clay */
+.plate--broken .plate-frame svg { max-height: none; width: 100%; }
+.plate--broken .plate-frame svg > rect:first-child { fill: transparent; stroke: none; }
+/* Wide screens: a box of fixed height, in which the script lays the tray beside
+   the board (the file has it below), so the whole puzzle is in view at once
+   and nothing moves when the script arrives */
+@media (min-width: 64rem) { .plate--broken .plate-frame svg { height: min(78vh, 60rem); } }
+.plate-frame svg .ghost { fill: var(--accent-ring); stroke: var(--rubric); stroke-width: 3; stroke-dasharray: 10 8; pointer-events: none; }
+.plate-frame svg .ghost.is-off { fill: transparent; stroke: var(--ink-soft); }
+.plate-frame svg .board { stroke: var(--clay-edge); }
+.plate-frame svg #board rect { fill: var(--paper); stroke: var(--rule); } /* the empty board: the leaf, ruled */
+.plate-frame svg .sherd { fill: var(--clay); stroke: var(--clay-edge); } /* the clay of a fragment */
+.plate-frame.is-rejoining svg .fragment { cursor: grab; touch-action: none; outline: none; }
+.plate-frame.is-rejoining svg .fragment:active { cursor: grabbing; }
+.plate-frame svg .fragment.is-picked .sherd { stroke: var(--rubric); stroke-width: 5; }
+.plate-frame svg .fragment:focus-visible .sherd { stroke: var(--accent); stroke-width: 5; }
+.plate-frame.is-whole svg .sherd { stroke: var(--rubric); }
+.rejoin { display: grid; gap: var(--space-3); margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--rule); }
+.rejoin-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.rejoin-head .index-heading { margin: 0; }
+.rejoin-tools { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.rejoin-restore { display: contents; } /* its button sits among the tools */
+.rejoin-status { margin: 0; font-family: var(--sans); font-size: 0.9rem; color: var(--ink-soft); min-height: calc(2 * 1.5em); line-height: 1.5; }
+.rejoin-reading { margin: 0; font-family: var(--mono); font-size: 0.95rem; overflow-wrap: anywhere; min-height: 1.5em; line-height: 1.5; }
+/* Tally signs, past their cords: the higher cord, in rubric */
+.plate-frame svg .tally path { color: var(--rubric); }
+.plate-frame svg .tally .cord { fill: var(--rubric); }
+
+/* A weathered plate's edition: restorations in rubric, doubts dotted under */
+.leiden-restored, .leiden-doubt { color: var(--rubric); }
+.leiden-doubt { text-decoration: underline dotted; text-underline-offset: 0.2em; }
+/* The novice's message, read with the abbot's key: the same hand, a step smaller */
+.transcription--second { font-size: clamp(1.2rem, 1.05rem + 0.6vw, 1.45rem); color: var(--ink-soft); }
+
+/* ---------- About ---------- */
+@media (min-width: 60rem) {
+  .spread--about { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+  .spread--about > aside { position: sticky; top: var(--space-5); }
+}
+.prose { max-width: var(--measure); }
+.prose p + p { margin-top: var(--space-4); }
+.prose .note { margin-top: var(--space-4); }
+.prose .index-heading { margin-top: 0; }
+
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); max-width: var(--measure); }
+.timeline li { display: grid; grid-template-columns: 2.2rem 1fr; gap: var(--space-4); align-items: start; }
+.timeline .glyph { width: 1.7rem; color: var(--accent); justify-self: center; }
+.timeline .glyph { --weight: 3; }
+.timeline-mark { justify-self: center; color: var(--ink-soft); }
+.timeline b { display: block; font-variant-numeric: lining-nums; }
+
+.mode--static { cursor: default; grid-template-columns: 1fr; border-color: var(--rule); box-shadow: inset 3px 0 0 var(--mode-accent); }
+.mode--static:hover { border-color: var(--rule); }
+.mode--static .mode-desc { grid-column: 1; }
+
+.playground { display: grid; gap: var(--space-4); }
+.playground-glyph {
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: var(--vellum);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+.playground-glyph .glyph { width: 6.5rem; color: var(--ink); }
+.playground-reading { font-family: var(--sans); font-size: 0.85rem; letter-spacing: 0.04em; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.playground-presets { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.playground-presets .btn { font-variant-numeric: lining-nums; letter-spacing: 0.05em; }
+input[type="number"] { font-variant-numeric: lining-nums; font-size: 1.3rem; }
+
+.tablet {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.4rem, 1fr));
+  gap: var(--space-2);
+}
+.tablet li {
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
+  padding: var(--space-2) var(--space-1);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+.tablet .glyph { width: 1.5rem; color: var(--ink); }
+.tablet .glyph { --weight: 3; }
+.tablet b { font-size: 1.15rem; line-height: 1.1; color: var(--accent); }
+.tablet span { font-family: var(--sans); font-size: 0.7rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+.sources { margin-top: var(--space-5); }
+.sources .index-heading { margin-top: 0; }
+.sources ul { margin: 0; padding-left: 1.2rem; display: grid; gap: var(--space-2); font-size: 1.05rem; }
+
+/* ---------- Two ways to read a plate: each layout and its origin ---------- */
+.layouts-origin { max-width: var(--measure); }
+.layouts-origin > p + p { margin-top: var(--space-4); }
+.layout-title { font-size: 1.3rem; font-weight: 600; line-height: 1.3; margin: var(--space-6) 0 0; }
+.layout-title + .turnings { margin-top: var(--space-4); }
+.turnings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-5);
+  margin: var(--space-5) 0;
+}
+.turnings figure { margin: 0; display: grid; gap: var(--space-3); align-content: start; }
+.turnings figcaption { font-size: 0.98rem; line-height: 1.4; color: var(--ink-soft); }
+.turnings figcaption b { display: block; color: var(--ink); font-weight: 600; }
+.turnings svg { width: 100%; max-width: 9rem; height: auto; }
+.turning rect, .turning > circle:first-child { fill: none; stroke: var(--rule); stroke-width: 1.2; }
+.turning polyline { fill: none; stroke: var(--accent); stroke-width: 1.4; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 0; }
+.turning-glyphs path { fill: none; stroke: var(--ink-soft); stroke-width: 1.2; }
+.turning .aperture { stroke: var(--accent); stroke-width: 1.4; }
+.turnings .grille-order { max-width: 7rem; }
+.turning .snail-start { fill: var(--accent); }
+@media (prefers-reduced-motion: no-preference) {
+  .turning polyline { stroke-dashoffset: 1; animation: ink 3s var(--ease-ink) 0.3s forwards; }
+}
+
+/* ---------- Lectio: the reading game ---------- */
+.lectio { display: grid; gap: var(--space-3); margin-top: var(--space-2); container-type: inline-size; }
+.lectio .index-heading { margin-bottom: 0; }
+.lectio-sign {
+  display: grid;
+  place-items: center;
+  min-height: 9.5rem;
+  padding: var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+.lectio-sign .glyph { width: 4.6rem; color: var(--ink); }
+.lectio-form { display: flex; gap: var(--space-2); }
+.lectio-form input { flex: 1; min-width: 0; }
+.lectio-feedback { font-style: italic; color: var(--ink-soft); min-height: 4.8em; min-height: 3lh; } /* the longest answer, reserved */
+@container (min-width: 22rem) { .lectio-feedback { min-height: 3.2em; min-height: 2lh; } }
+.lectio-standing { font-family: var(--sans); font-size: 0.78rem; letter-spacing: 0.06em; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.lectio-standing [data-lectio-rank] { color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; }
+
+/* ---------- Erratum ---------- */
+.erratum-text { font-size: 1.35rem; max-width: var(--measure); margin-bottom: var(--space-6); }
+
+/* ---------- Colophon ---------- */
+.colophon {
+  width: min(72rem, 100% - 2 * var(--space-5));
+  margin: 0 auto;
+  padding: var(--space-5) 0 var(--space-6);
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  font-size: 0.98rem;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+.colophon a { color: var(--ink-soft); }
+.colophon a:hover { color: var(--accent); }
+.colophon nav { display: flex; gap: var(--space-4); font-style: normal; font-family: var(--sans); font-size: 0.8rem; }
+/* Hear the hand: the one control for the sounds of silence, a link among the colophon's links */
+.hear { appearance: none; background: none; border: 0; padding: 0; margin: 0; font: inherit; color: var(--ink-soft); cursor: pointer; text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 0.18em; }
+.hear:hover { color: var(--accent); }
+.hear[aria-pressed="true"] { color: var(--accent); text-decoration-color: var(--accent); }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-5);
+  transform: translate(-50%, 1rem);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--sans);
+  font-size: 0.88rem;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s var(--ease), transform 0.2s var(--ease);
+}
+.toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- Motion ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .snail polyline { stroke-dashoffset: 1; animation: ink 2.6s var(--ease) 0.4s forwards; }
+  .leaf { animation: rise 0.6s var(--ease) both; }
+  .spread > .leaf:nth-child(2) { animation-delay: 0.08s; }
+}
+@keyframes rise { from { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  body { transition: none; }
+  .nav a::after, .plate-focus, .glyph path, .quadrant b, .slot, .preview-stage > *, .segment, .plate-frame .grille-sheet, .plate-frame svg path { transition: none; }
+}
+
+/* ---------- Small screens ---------- */
+@media (max-width: 34rem) {
+  body { font-size: 1.0625rem; }
+  .masthead { padding-top: var(--space-4); }
+  .brand-tag { display: none; }
+  .folio { margin-top: var(--space-4); }
+  .folio-mark { display: none; }
+  .entry > .btn--primary,
+  .entry-end > .btn--primary { width: 100%; }
+  .tabula { grid-template-columns: repeat(5, minmax(0, 1fr)); row-gap: var(--space-3); }
+  .actions .btn { flex: 1 1 auto; }
+  /* The primary action and a toggle take a line each; the quiet exports share the line
+     between them where they fit (390 px), one line each on the smallest phones */
+  .actions .btn--primary, .actions [aria-pressed] { flex-basis: 100%; }
+  .actions .btn--quiet { padding-inline: var(--space-2); white-space: nowrap; }
+}
+
+/* ---------- Print: the plate alone, black on white ---------- */
+@media print {
+  body { background: #fff; color: #000; }
+  .masthead nav, .colophon, .actions, .readback, .skip-link, .toast, .folio-mark, .plate-zoom, .chapter-nav { display: none !important; }
+  .leaf { box-shadow: none; border: 0; padding: 0; }
+  .leaf::before { display: none; }
+  .plate-frame { border: 0; box-shadow: none; max-height: none; overflow: visible; }
+  .plate-frame svg path { fill: #000; }
+  .plate-frame .grille-sheet { display: none; }
+}

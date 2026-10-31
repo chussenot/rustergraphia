@@ -1,0 +1,26 @@
+[package]
+name = "rustergraphia-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Web application for Rustergraphia: the abbey's leaf, served"
+
+[dependencies]
+rustergraphia.workspace = true
+axum.workspace = true
+multer.workspace = true
+serde.workspace = true
+futures-util.workspace = true
+tokio.workspace = true
+tower.workspace = true
+flate2.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+chrono.workspace = true
+httpdate.workspace = true
+sha2.workspace = true
+xmltree.workspace = true
+
+[dev-dependencies]
+regex = "1"

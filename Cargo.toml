@@ -1,0 +1,43 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/rustergraphia",
+    "crates/rustergraphia-cli",
+    "crates/rustergraphia-web",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/chussenot/rustergraphia"
+
+[workspace.dependencies]
+rustergraphia = { path = "crates/rustergraphia" }
+sha2 = "0.10"
+aes-gcm = "0.10"
+scrypt = { version = "0.11", default-features = false }
+num-bigint = "0.4"
+getrandom = "0.2"
+xmltree = "0.11"
+thiserror = "1"
+clap = { version = "4", features = ["derive"] }
+rpassword = "7"
+axum = { version = "0.8", features = ["multipart"] }
+multer = "3"
+futures-util = { version = "0.3", default-features = false }
+tokio = { version = "1", features = ["full"] }
+tower = "0.5"
+flate2 = "1"
+serde_yaml = "0.9"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+httpdate = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+
+[profile.release]
+lto = true
+
+# Dependencies (scrypt above all) at full speed even in dev test runs
+[profile.dev.package."*"]
+opt-level = 2

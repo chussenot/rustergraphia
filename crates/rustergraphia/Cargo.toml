@@ -1,0 +1,19 @@
+[package]
+name = "rustergraphia"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Cistergraphia in Rust: your secrets, in a monk's handwriting"
+
+[dependencies]
+sha2.workspace = true
+aes-gcm.workspace = true
+scrypt.workspace = true
+num-bigint.workspace = true
+getrandom.workspace = true
+xmltree.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
