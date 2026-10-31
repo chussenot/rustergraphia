@@ -14,6 +14,7 @@
 //! ([`ruby_random`]), so a plate with a tablet of its own, or the day's
 //! chapter, is the same plate under both.
 
+pub mod along;
 pub mod cipher;
 pub mod error;
 pub mod fragments;

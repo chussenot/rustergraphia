@@ -183,6 +183,13 @@ pub fn turn([x1, y1, x2, y2]: Line) -> Line {
     [WIDTH - x1, HEIGHT - y1, WIDTH - x2, HEIGHT - y2]
 }
 
+/// The number a sign reads as once turned half round: its units trade
+/// places with its thousands, its tens with its hundreds.
+pub fn turned(num: Value) -> Result<Value> {
+    let strokes: Vec<Line> = strokes(num, 0, 0).into_iter().map(turn).collect();
+    read(&strokes)
+}
+
 /// Turns the strokes of one symbol (relative to its origin) back into a number.
 pub fn read(strokes: &[Line]) -> Result<Value> {
     let mut strokes: Vec<Line> = strokes.iter().map(|&line| canonical(line)).collect();
