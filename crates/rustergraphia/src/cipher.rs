@@ -260,7 +260,9 @@ pub fn decipher(sequence: &[Value], tablet_seed: Option<&str>) -> Result<String>
         None => None,
     };
     values
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| {
             let sum = pair[0] + pair[1];
             let letter = match &own_tablet {

@@ -54,7 +54,9 @@ pub fn read(svg_text: &str) -> Result<Option<Vec<Value>>> {
 /// pairs (a second sign of [`EVIL_MARKER`]) are left out.
 pub fn pairs(sequence: &[Value]) -> Vec<(Value, Value, Value)> {
     sequence
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .filter(|pair| pair[1] != EVIL_MARKER)
         .map(|pair| (pair[0], pair[1], pair[0] + pair[1]))
         .collect()
