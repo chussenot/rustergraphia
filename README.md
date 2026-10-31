@@ -51,6 +51,8 @@ This is not a look-alike: it is the same cipher, bit for bit.
 - The web scriptorium renders the same pages: [docs/ui-proofs.md](docs/ui-proofs.md)
   screenshots the original and the clone side by side, and 16 of 16
   deterministic pages come out pixel-identical.
+- The few places where the clone differs on purpose, and why, are listed in
+  [docs/differences.md](docs/differences.md).
 
 Try it
 ------
