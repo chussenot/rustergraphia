@@ -1,3 +1,6 @@
 target/
 tmp/
 .claude/worktrees/
+infra/.terraform/
+infra/terraform.tfvars
+infra/*.tfstate*

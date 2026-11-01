@@ -5,18 +5,30 @@ on:
     branches: [master]
   pull_request:
 
+permissions:
+  contents: read
+
+# bash with pipefail (GitHub's default shell has none): a check that fails
+# behind the `| tee` of a step summary must fail its step
+defaults:
+  run:
+    shell: bash
+
 env:
   CARGO_TERM_COLOR: always
 
+# Every action is pinned to a commit (its version in a comment, so Dependabot
+# moves them): a tag can be moved to code nobody reviewed, a commit cannot.
+# The Rust toolchain is the runner's own rustup, not an action
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@v2
+          persist-credentials: false
+      - run: rustup toolchain install stable --profile minimal --component clippy,rustfmt && rustup default stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Format
         run: cargo fmt --all --check
       - name: Lint
@@ -29,15 +41,76 @@ jobs:
   interop:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           repository: chussenot/cistergraphia
           path: cistergraphia
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - uses: ruby/setup-ruby@v1
+          persist-credentials: false
+      - run: rustup toolchain install stable --profile minimal && rustup default stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
         with:
           ruby-version: "3.3"
       - name: Cross-check both implementations
         run: CISTERGRAPHIA_DIR="$PWD/cistergraphia" tools/interop-check.sh
+
+  # The container the site is served from (Dockerfile): built, run, and every
+  # page asked for (deploy/smoke.sh), so a change cannot break the image
+  # before the Deploy workflow ships it
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          load: true
+          tags: rustergraphia:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - run: docker run --detach --name web --publish 8080:8080 rustergraphia:ci
+      - run: deploy/smoke.sh http://127.0.0.1:8080 | tee /tmp/smoke.log && tail -1 /tmp/smoke.log >> "$GITHUB_STEP_SUMMARY"
+      # The instance stops on SIGTERM at once, finishing what is in flight:
+      # Cloud Run gives ten seconds, and a server that ignores the signal is
+      # killed when they run out
+      - run: |
+          started=$(date +%s)
+          docker stop --time 10 web
+          took=$(( $(date +%s) - started ))
+          echo "stopped in ${took} s"
+          (( took < 5 )) || { echo "::error::SIGTERM was not handled (${took} s)"; exit 1; }
+      - run: docker logs web
+        if: always()
+      # What the image carries (the base image's packages): no known
+      # vulnerability of high or critical severity that has a fix
+      - run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/aquasecurity/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+          image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln rustergraphia:ci
+      # What the binary is built from (the crates in Cargo.lock), which the
+      # image scan cannot see inside a compiled binary
+      - run: >-
+          docker run --rm -v "$PWD:/src:ro" -w /src ghcr.io/aquasecurity/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+          fs --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln Cargo.lock
+
+  # The infrastructure as code (infra/): formatted, and valid against the
+  # providers' schemas. No credentials: nothing is planned or applied here
+  infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+      - run: terraform -chdir=infra fmt -check -diff
+      - run: terraform -chdir=infra init -backend=false -input=false
+      - run: terraform -chdir=infra validate
+      # The Terraform read as a security reviewer would
+      - run: >-
+          docker run --rm -v "$PWD:/src:ro" -w /src ghcr.io/aquasecurity/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+          config --exit-code 1 --severity HIGH,CRITICAL infra
