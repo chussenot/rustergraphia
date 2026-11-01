@@ -30,6 +30,34 @@ async fn main() {
     let bound = listener.local_addr().expect("a bound address");
     println!("rustergraphia-web listening on {bound}");
     axum::serve(listener, app(Config::from_env()))
+        .with_graceful_shutdown(shutdown())
         .await
         .expect("serve");
+}
+
+/// Resolves on SIGTERM (a platform stopping the instance: Cloud Run gives
+/// ten seconds) or Ctrl-C: the server then takes no new connection and lets
+/// the requests in flight finish. In a container the server is PID 1, which
+/// the kernel shields from a signal it has no handler for: without this,
+/// SIGTERM is ignored and the instance is killed when its grace runs out.
+async fn shutdown() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c().await.ok();
+    };
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut signal) => {
+                signal.recv().await;
+            }
+            Err(_) => std::future::pending().await,
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+    tokio::select! {
+        () = ctrl_c => {}
+        () = terminate => {}
+    }
+    println!("rustergraphia-web stopping: finishing the requests in flight");
 }

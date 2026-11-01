@@ -1,0 +1,18 @@
+# What the image does not need: the build reads the workspace's manifests,
+# the crates' sources and the web crate's public/ and chapters.yml
+# (Dockerfile). Everything else is build output, history, tests, fixtures,
+# documentation or tooling.
+.git
+.github
+.claude
+target
+tmp
+docs
+tools
+deploy
+infra
+crates/*/tests
+crates/*/examples
+Dockerfile
+.dockerignore
+*.md

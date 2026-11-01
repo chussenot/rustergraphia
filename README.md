@@ -68,6 +68,7 @@ target/release/rustergraphia -m "Ora et labora" --broken --weathered
 target/release/rustergraphia -m "The relics are under the third stone" --decoy "Vespers at six" -g K7Q2M-ZXB4P
 target/release/rustergraphia -d plate.svg          # decode; -s for sealed plates
 cargo run -p rustergraphia-web                     # the web scriptorium on :9292
+docker build -t rustergraphia . && docker run -p 8080:8080 rustergraphia   # the container Cloud Run runs
 ```
 
 The passphrase for sealed plates is prompted without echo, or taken from
@@ -91,7 +92,8 @@ module per Ruby file; the command line in
 HTML as the original so its stylesheet and scripts carry over unchanged.
 [PORTING.md](PORTING.md) is the porting contract;
 [docs/web-port-spec.md](docs/web-port-spec.md) the web layer's functional
-specification, surveyed from the running Ruby app.
+specification, surveyed from the running Ruby app; [docs/going-live.md](docs/going-live.md)
+how it is deployed to Cloud Run behind Cloudflare.
 
 Why, and further reading
 ------------------------

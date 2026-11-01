@@ -48,6 +48,7 @@ Differences you might notice
 | Chapter checks | `rake chapter:check` and `rake chapter:runway`. | Subcommands of the web binary: `rustergraphia-web chapter-check [DAYS]` and `rustergraphia-web chapter-runway`. |
 | Environment | `PORT`, `FRONT_DOOR_KEY`, `CHAPTER_DATE`. | The same three, plus `RUSTERGRAPHIA_PUBLIC` to serve the static files from another directory. |
 | Concurrency settings | Puma, sized by `WEB_CONCURRENCY` and `PUMA_THREADS`. | One Tokio process, with no worker or thread settings. Plate work runs on Tokio's blocking pool. |
+| Deployment | Cloud Run: 1 vCPU, 512 MiB, 3 requests per instance; the `ruby` slim image. | The same design ([going-live.md](going-live.md)): 1 vCPU, 256 MiB (first-generation environment), 10 requests per instance; a 48 MB distroless image. The Terraform names everything after the service, and `zone_settings` lets both sites share one Cloudflare zone. |
 | `HEAD` responses | `content-length: 0`. | The length of the matching GET, as hyper reports it. |
 | Early 413 | Puma reads the whole body, then refuses it. | The connection closes without reading the rest, so a client that is still uploading may see a broken pipe instead of the 413. |
 
@@ -57,8 +58,6 @@ Not ported
 These are parts of the original's repository rather than features of the
 program:
 
-- **Deployment.** The `Dockerfile`, `Procfile`, `deploy/`, `infra/`
-  (Terraform for Cloud Run and Cloudflare) and the deploy workflows.
 - **Browser suites and assets tasks.** The Playwright suites
   (`rake ui:stability`, `ui:play`, `ui:e2e`) and `rake og:image`. The social
   preview image is served as-is from `public/og.png`.
